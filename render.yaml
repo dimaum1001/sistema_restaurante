@@ -1,0 +1,34 @@
+databases:
+  - name: restaurante-db
+    databaseName: restaurante
+    plan: free
+services:
+  - type: web
+    name: restaurante-backend
+    env: python
+    plan: free
+    buildCommand: |
+      cd backend
+      pip install --upgrade pip
+      pip install -r requirements.txt
+    startCommand: |
+      cd backend
+      alembic upgrade head
+      uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: restaurante-db
+          property: connectionString
+      - key: TENANCY_STRATEGY
+        value: column
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRE_MINUTES
+        value: "30"
+      - key: REFRESH_TOKEN_EXPIRE_MINUTES
+        value: "1440"
+      - key: PRIVACY_CONTACT_EMAIL
+        value: privacidade@example.com
+      - key: CORS_ORIGINS
+        value: https://SEU_DOMINIO_FRONTEND.vercel.app

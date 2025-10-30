@@ -1,0 +1,803 @@
+import { useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import api from '../../../hooks/useApi'
+
+type TabKey = 'dishes' | 'ingredients' | 'beverages' | 'units'
+
+interface Unit {
+  id: number
+  name: string
+  abbreviation: string
+}
+
+interface Product {
+  id: number
+  name: string
+  sale_price?: number
+  cost_price?: number
+  unit?: Unit
+}
+
+interface ProductPayload {
+  name: string
+  type: string
+  unit_id?: number
+  sale_price?: number
+  cost_price?: number
+}
+
+interface SaveProductArgs {
+  id?: number
+  payload: ProductPayload
+}
+
+const emptyDishForm = {
+  name: '',
+  unit_id: '' as number | '',
+  sale_price: '',
+  cost_price: '',
+}
+
+const emptyIngredientForm = {
+  name: '',
+  unit_id: '' as number | '',
+  cost_price: '',
+}
+
+const emptyBeverageForm = {
+  name: '',
+  unit_id: '' as number | '',
+  sale_price: '',
+  cost_price: '',
+}
+
+const emptyUnitForm = {
+  name: '',
+  abbreviation: '',
+}
+
+export default function ProductsPage() {
+  const queryClient = useQueryClient()
+  const [activeTab, setActiveTab] = useState<TabKey>('dishes')
+
+  const [dishForm, setDishForm] = useState(emptyDishForm)
+  const [dishEditingId, setDishEditingId] = useState<number | null>(null)
+  const [dishError, setDishError] = useState<string | null>(null)
+
+  const [ingredientForm, setIngredientForm] = useState(emptyIngredientForm)
+  const [ingredientEditingId, setIngredientEditingId] = useState<number | null>(null)
+  const [ingredientError, setIngredientError] = useState<string | null>(null)
+
+  const [beverageForm, setBeverageForm] = useState(emptyBeverageForm)
+  const [beverageEditingId, setBeverageEditingId] = useState<number | null>(null)
+  const [beverageError, setBeverageError] = useState<string | null>(null)
+
+  const [unitForm, setUnitForm] = useState(emptyUnitForm)
+  const [unitError, setUnitError] = useState<string | null>(null)
+  const [unitSuccess, setUnitSuccess] = useState<string | null>(null)
+
+  const dishesQuery = useQuery<Product[]>({
+    queryKey: ['products', 'dishes'],
+    queryFn: async () => {
+      const response = await api.get('/products', { params: { product_type: 'dish' } })
+      return response.data
+    },
+  })
+
+  const ingredientsQuery = useQuery<Product[]>({
+    queryKey: ['products', 'ingredients'],
+    queryFn: async () => {
+      const response = await api.get('/products', { params: { product_type: 'ingredient' } })
+      return response.data
+    },
+  })
+
+  const beveragesQuery = useQuery<Product[]>({
+    queryKey: ['products', 'beverages'],
+    queryFn: async () => {
+      const response = await api.get('/products', { params: { product_type: 'merchandise' } })
+      return response.data
+    },
+  })
+
+  const unitsQuery = useQuery<Unit[]>({
+    queryKey: ['units'],
+    queryFn: async () => {
+      const response = await api.get('/products/units')
+      return response.data
+    },
+  })
+
+  const productsMutation = useMutation({
+    mutationFn: async ({ id, payload }: SaveProductArgs) => {
+      if (id) {
+        const response = await api.put(`/products/${id}`, payload)
+        return response.data
+      }
+      const response = await api.post('/products', payload)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products', 'dishes'] })
+      queryClient.invalidateQueries({ queryKey: ['products', 'ingredients'] })
+      queryClient.invalidateQueries({ queryKey: ['products', 'beverages'] })
+    },
+  })
+
+  const unitMutation = useMutation({
+    mutationFn: async () => {
+      const response = await api.post('/products/units', {
+        name: unitForm.name.trim(),
+        abbreviation: unitForm.abbreviation.trim(),
+      })
+      return response.data
+    },
+    onSuccess: () => {
+      setUnitForm(emptyUnitForm)
+      setUnitError(null)
+      setUnitSuccess('Unidade cadastrada com sucesso.')
+      queryClient.invalidateQueries({ queryKey: ['units'] })
+    },
+    onError: (err: any) => {
+      setUnitSuccess(null)
+      setUnitError(err.response?.data?.detail || 'Erro ao cadastrar unidade')
+    },
+  })
+
+  const orderedDishes = useMemo(() => {
+    return (dishesQuery.data ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+  }, [dishesQuery.data])
+
+  const orderedIngredients = useMemo(() => {
+    return (ingredientsQuery.data ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+  }, [ingredientsQuery.data])
+
+  const orderedBeverages = useMemo(() => {
+    return (beveragesQuery.data ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+  }, [beveragesQuery.data])
+
+  const orderedUnits = useMemo(() => {
+    return (unitsQuery.data ?? []).slice().sort((a, b) => a.name.localeCompare(b.name))
+  }, [unitsQuery.data])
+
+  const resetDishForm = () => {
+    setDishForm(emptyDishForm)
+    setDishEditingId(null)
+    setDishError(null)
+  }
+
+  const resetIngredientForm = () => {
+    setIngredientForm(emptyIngredientForm)
+    setIngredientEditingId(null)
+    setIngredientError(null)
+  }
+
+  const resetBeverageForm = () => {
+    setBeverageForm(emptyBeverageForm)
+    setBeverageEditingId(null)
+    setBeverageError(null)
+  }
+
+  const handleSubmitDish = (event: React.FormEvent) => {
+    event.preventDefault()
+    setDishError(null)
+
+    const payload: ProductPayload = {
+      name: dishForm.name.trim(),
+      type: 'dish',
+      unit_id: dishForm.unit_id ? Number(dishForm.unit_id) : undefined,
+      sale_price: dishForm.sale_price ? Number(dishForm.sale_price) : undefined,
+      cost_price: dishForm.cost_price ? Number(dishForm.cost_price) : undefined,
+    }
+
+    if (!payload.name) {
+      setDishError('Informe o nome do prato.')
+      return
+    }
+    if (!payload.sale_price || payload.sale_price <= 0) {
+      setDishError('Informe um preco de venda maior que zero.')
+      return
+    }
+
+    productsMutation.mutate(
+      { id: dishEditingId ?? undefined, payload },
+      {
+        onSuccess: () => resetDishForm(),
+        onError: (err: any) => {
+          setDishError(err.response?.data?.detail || 'Erro ao salvar o prato.')
+        },
+      },
+    )
+  }
+
+  const handleSubmitIngredient = (event: React.FormEvent) => {
+    event.preventDefault()
+    setIngredientError(null)
+
+    const payload: ProductPayload = {
+      name: ingredientForm.name.trim(),
+      type: 'ingredient',
+      unit_id: ingredientForm.unit_id ? Number(ingredientForm.unit_id) : undefined,
+      cost_price: ingredientForm.cost_price ? Number(ingredientForm.cost_price) : undefined,
+    }
+
+    if (!payload.name) {
+      setIngredientError('Informe o nome do insumo.')
+      return
+    }
+    if (!payload.unit_id) {
+      setIngredientError('Selecione a unidade de medida.')
+      return
+    }
+
+    productsMutation.mutate(
+      { id: ingredientEditingId ?? undefined, payload },
+      {
+        onSuccess: () => resetIngredientForm(),
+        onError: (err: any) => {
+          setIngredientError(err.response?.data?.detail || 'Erro ao salvar o insumo.')
+        },
+      },
+    )
+  }
+
+  const handleSubmitBeverage = (event: React.FormEvent) => {
+    event.preventDefault()
+    setBeverageError(null)
+
+    const payload: ProductPayload = {
+      name: beverageForm.name.trim(),
+      type: 'merchandise',
+      unit_id: beverageForm.unit_id ? Number(beverageForm.unit_id) : undefined,
+      sale_price: beverageForm.sale_price ? Number(beverageForm.sale_price) : undefined,
+      cost_price: beverageForm.cost_price ? Number(beverageForm.cost_price) : undefined,
+    }
+
+    if (!payload.name) {
+      setBeverageError('Informe o nome da bebida.')
+      return
+    }
+    if (!payload.sale_price || payload.sale_price <= 0) {
+      setBeverageError('Informe o preco de venda da bebida.')
+      return
+    }
+
+    productsMutation.mutate(
+      { id: beverageEditingId ?? undefined, payload },
+      {
+        onSuccess: () => resetBeverageForm(),
+        onError: (err: any) => {
+          setBeverageError(err.response?.data?.detail || 'Erro ao salvar a bebida.')
+        },
+      },
+    )
+  }
+
+  const handleDishEdit = (product: Product) => {
+    setDishEditingId(product.id)
+    setDishForm({
+      name: product.name,
+      unit_id: product.unit?.id ?? ('' as number | ''),
+      sale_price: product.sale_price !== undefined ? product.sale_price.toString() : '',
+      cost_price: product.cost_price !== undefined ? product.cost_price.toString() : '',
+    })
+    setDishError(null)
+    setActiveTab('dishes')
+  }
+
+  const handleIngredientEdit = (product: Product) => {
+    setIngredientEditingId(product.id)
+    setIngredientForm({
+      name: product.name,
+      unit_id: product.unit?.id ?? ('' as number | ''),
+      cost_price: product.cost_price !== undefined ? product.cost_price.toString() : '',
+    })
+    setIngredientError(null)
+    setActiveTab('ingredients')
+  }
+
+  const handleBeverageEdit = (product: Product) => {
+    setBeverageEditingId(product.id)
+    setBeverageForm({
+      name: product.name,
+      unit_id: product.unit?.id ?? ('' as number | ''),
+      sale_price: product.sale_price !== undefined ? product.sale_price.toString() : '',
+      cost_price: product.cost_price !== undefined ? product.cost_price.toString() : '',
+    })
+    setBeverageError(null)
+    setActiveTab('beverages')
+  }
+
+  const handleSubmitUnit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setUnitError(null)
+    setUnitSuccess(null)
+
+    if (!unitForm.name.trim() || !unitForm.abbreviation.trim()) {
+      setUnitError('Preencha nome e abreviacao.')
+      return
+    }
+    unitMutation.mutate()
+  }
+
+  const renderTabs = () => (
+    <div className="flex flex-wrap gap-2">
+      <TabButton label="Pratos" tab="dishes" activeTab={activeTab} onClick={setActiveTab} />
+      <TabButton label="Insumos" tab="ingredients" activeTab={activeTab} onClick={setActiveTab} />
+      <TabButton label="Bebidas" tab="beverages" activeTab={activeTab} onClick={setActiveTab} />
+      <TabButton label="Unidades" tab="units" activeTab={activeTab} onClick={setActiveTab} />
+    </div>
+  )
+
+  const renderDishPanel = () => (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmitDish} className="bg-white p-6 rounded shadow space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {dishEditingId ? 'Editar prato' : 'Cadastrar prato'}
+          </h2>
+          {dishEditingId && (
+            <button type="button" className="text-sm text-blue-600 hover:text-blue-700" onClick={resetDishForm}>
+              Cancelar edicao
+            </button>
+          )}
+        </div>
+        {dishError && <div className="text-sm text-red-500">{dishError}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Nome do prato">
+            <input
+              className="w-full border rounded px-3 py-2"
+              value={dishForm.name}
+              onChange={(event) => setDishForm({ ...dishForm, name: event.target.value })}
+              required
+            />
+          </Field>
+            <Field label="Unidade (porcao, prato, etc.)">
+            <select
+              className="w-full border rounded px-3 py-2"
+              value={dishForm.unit_id}
+              onChange={(event) =>
+                setDishForm({ ...dishForm, unit_id: event.target.value as unknown as number | '' })
+              }
+            >
+              <option value="">Selecione...</option>
+              {orderedUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.abbreviation})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Preco de venda">
+            <input
+              className="w-full border rounded px-3 py-2"
+              type="number"
+              step="0.01"
+              value={dishForm.sale_price}
+              onChange={(event) => setDishForm({ ...dishForm, sale_price: event.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Custo medio (opcional)">
+            <input
+              className="w-full border rounded px-3 py-2"
+              type="number"
+              step="0.01"
+              value={dishForm.cost_price}
+              onChange={(event) => setDishForm({ ...dishForm, cost_price: event.target.value })}
+            />
+          </Field>
+        </div>
+        <button
+          type="submit"
+          disabled={productsMutation.isPending}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+        >
+          {productsMutation.isPending ? 'Salvando...' : dishEditingId ? 'Atualizar prato' : 'Adicionar prato'}
+        </button>
+      </form>
+
+      <section className="bg-white rounded shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800">Pratos cadastrados</h3>
+        </div>
+        {dishesQuery.isLoading ? (
+          <div className="p-4 text-sm text-gray-500">Carregando pratos...</div>
+        ) : (
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Prato</th>
+                <th className="px-4 py-3 text-left font-medium">Unidade</th>
+                <th className="px-4 py-3 text-right font-medium">Preco</th>
+                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orderedDishes.map((dish) => (
+                <tr key={dish.id} className={dishEditingId === dish.id ? 'bg-blue-50/50' : ''}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{dish.name}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {dish.unit ? `${dish.unit.name} (${dish.unit.abbreviation})` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-800">
+                    {dish.sale_price !== undefined ? `R$ ${dish.sale_price.toFixed(2)}` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                      onClick={() => handleDishEdit(dish)}
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {orderedDishes.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
+                    Nenhum prato cadastrado ainda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  )
+
+  const renderIngredientPanel = () => (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmitIngredient} className="bg-white p-6 rounded shadow space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {ingredientEditingId ? 'Editar insumo' : 'Cadastrar insumo'}
+          </h2>
+          {ingredientEditingId && (
+            <button type="button" className="text-sm text-blue-600 hover:text-blue-700" onClick={resetIngredientForm}>
+              Cancelar edicao
+            </button>
+          )}
+        </div>
+        {ingredientError && <div className="text-sm text-red-500">{ingredientError}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Nome do insumo">
+            <input
+              className="w-full border rounded px-3 py-2"
+              value={ingredientForm.name}
+              onChange={(event) => setIngredientForm({ ...ingredientForm, name: event.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Unidade de controle">
+            <select
+              className="w-full border rounded px-3 py-2"
+              value={ingredientForm.unit_id}
+              onChange={(event) =>
+                setIngredientForm({ ...ingredientForm, unit_id: event.target.value as unknown as number | '' })
+              }
+              required
+            >
+              <option value="">Selecione...</option>
+              {orderedUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.abbreviation})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Custo medio">
+            <input
+              className="w-full border rounded px-3 py-2"
+              type="number"
+              step="0.01"
+              value={ingredientForm.cost_price}
+              onChange={(event) => setIngredientForm({ ...ingredientForm, cost_price: event.target.value })}
+              required
+            />
+          </Field>
+        </div>
+        <button
+          type="submit"
+          disabled={productsMutation.isPending}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+        >
+          {productsMutation.isPending ? 'Salvando...' : ingredientEditingId ? 'Atualizar insumo' : 'Adicionar insumo'}
+        </button>
+      </form>
+
+      <section className="bg-white rounded shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800">Insumos cadastrados</h3>
+        </div>
+        {ingredientsQuery.isLoading ? (
+          <div className="p-4 text-sm text-gray-500">Carregando insumos...</div>
+        ) : (
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Insumo</th>
+                <th className="px-4 py-3 text-left font-medium">Unidade</th>
+                <th className="px-4 py-3 text-right font-medium">Custo</th>
+                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orderedIngredients.map((ingredient) => (
+                <tr key={ingredient.id} className={ingredientEditingId === ingredient.id ? 'bg-blue-50/50' : ''}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{ingredient.name}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {ingredient.unit ? `${ingredient.unit.name} (${ingredient.unit.abbreviation})` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-800">
+                    {ingredient.cost_price !== undefined ? `R$ ${ingredient.cost_price.toFixed(2)}` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                      onClick={() => handleIngredientEdit(ingredient)}
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {orderedIngredients.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
+                    Nenhum insumo cadastrado ainda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  )
+
+  const renderBeveragePanel = () => (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmitBeverage} className="bg-white p-6 rounded shadow space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-gray-800">
+            {beverageEditingId ? 'Editar bebida' : 'Cadastrar bebida'}
+          </h2>
+          {beverageEditingId && (
+            <button type="button" className="text-sm text-blue-600 hover:text-blue-700" onClick={resetBeverageForm}>
+              Cancelar edicao
+            </button>
+          )}
+        </div>
+        {beverageError && <div className="text-sm text-red-500">{beverageError}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Field label="Nome da bebida">
+            <input
+              className="w-full border rounded px-3 py-2"
+              value={beverageForm.name}
+              onChange={(event) => setBeverageForm({ ...beverageForm, name: event.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Unidade (garrafa, lata, ml...)">
+            <select
+              className="w-full border rounded px-3 py-2"
+              value={beverageForm.unit_id}
+              onChange={(event) =>
+                setBeverageForm({ ...beverageForm, unit_id: event.target.value as unknown as number | '' })
+              }
+            >
+              <option value="">Selecione...</option>
+              {orderedUnits.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.abbreviation})
+                </option>
+              ))}
+            </select>
+          </Field>
+          <Field label="Preco de venda">
+            <input
+              className="w-full border rounded px-3 py-2"
+              type="number"
+              step="0.01"
+              value={beverageForm.sale_price}
+              onChange={(event) => setBeverageForm({ ...beverageForm, sale_price: event.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Custo medio (opcional)">
+            <input
+              className="w-full border rounded px-3 py-2"
+              type="number"
+              step="0.01"
+              value={beverageForm.cost_price}
+              onChange={(event) => setBeverageForm({ ...beverageForm, cost_price: event.target.value })}
+            />
+          </Field>
+        </div>
+        <button
+          type="submit"
+          disabled={productsMutation.isPending}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+        >
+          {productsMutation.isPending ? 'Salvando...' : beverageEditingId ? 'Atualizar bebida' : 'Adicionar bebida'}
+        </button>
+      </form>
+
+      <section className="bg-white rounded shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800">Bebidas cadastradas</h3>
+        </div>
+        {beveragesQuery.isLoading ? (
+          <div className="p-4 text-sm text-gray-500">Carregando bebidas...</div>
+        ) : (
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Bebida</th>
+                <th className="px-4 py-3 text-left font-medium">Unidade</th>
+                <th className="px-4 py-3 text-right font-medium">Preco</th>
+                <th className="px-4 py-3 text-right font-medium">Acoes</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orderedBeverages.map((beverage) => (
+                <tr key={beverage.id} className={beverageEditingId === beverage.id ? 'bg-blue-50/50' : ''}>
+                  <td className="px-4 py-3 font-medium text-gray-900">{beverage.name}</td>
+                  <td className="px-4 py-3 text-gray-600">
+                    {beverage.unit ? `${beverage.unit.name} (${beverage.unit.abbreviation})` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right text-gray-800">
+                    {beverage.sale_price !== undefined ? `R$ ${beverage.sale_price.toFixed(2)}` : 'N/A'}
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <button
+                      className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                      onClick={() => handleBeverageEdit(beverage)}
+                    >
+                      Editar
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {orderedBeverages.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
+                    Nenhuma bebida cadastrada ainda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  )
+
+  const renderUnitPanel = () => (
+    <div className="space-y-6">
+      <form onSubmit={handleSubmitUnit} className="bg-white p-6 rounded shadow space-y-3">
+        <h2 className="text-lg font-semibold text-gray-800">Cadastrar unidade de medida</h2>
+        {unitError && <div className="text-sm text-red-500">{unitError}</div>}
+        {unitSuccess && <div className="text-sm text-green-600">{unitSuccess}</div>}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Field label="Nome completo">
+            <input
+              className="w-full border rounded px-3 py-2"
+              value={unitForm.name}
+              onChange={(event) => setUnitForm({ ...unitForm, name: event.target.value })}
+              required
+            />
+          </Field>
+          <Field label="Abreviacao">
+            <input
+              className="w-full border rounded px-3 py-2"
+              value={unitForm.abbreviation}
+              onChange={(event) => setUnitForm({ ...unitForm, abbreviation: event.target.value })}
+              required
+            />
+          </Field>
+        </div>
+        <button
+          type="submit"
+          disabled={unitMutation.isPending}
+          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+        >
+          {unitMutation.isPending ? 'Salvando...' : 'Cadastrar unidade'}
+        </button>
+      </form>
+
+      <section className="bg-white rounded shadow overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100">
+          <h3 className="text-lg font-semibold text-gray-800">Unidades cadastradas</h3>
+        </div>
+        {unitsQuery.isLoading ? (
+          <div className="p-4 text-sm text-gray-500">Carregando unidades...</div>
+        ) : (
+          <table className="min-w-full text-sm">
+            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+              <tr>
+                <th className="px-4 py-3 text-left font-medium">Nome</th>
+                <th className="px-4 py-3 text-left font-medium">Abreviacao</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-100">
+              {orderedUnits.map((unit) => (
+                <tr key={unit.id}>
+                  <td className="px-4 py-3 text-gray-800">{unit.name}</td>
+                  <td className="px-4 py-3 text-gray-600">{unit.abbreviation}</td>
+                </tr>
+              ))}
+              {orderedUnits.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-center text-gray-500" colSpan={2}>
+                    Nenhuma unidade cadastrada ainda.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </section>
+    </div>
+  )
+
+  let content: JSX.Element
+  if (activeTab === 'dishes') {
+    content = renderDishPanel()
+  } else if (activeTab === 'ingredients') {
+    content = renderIngredientPanel()
+  } else if (activeTab === 'beverages') {
+    content = renderBeveragePanel()
+  } else {
+    content = renderUnitPanel()
+  }
+
+  return (
+    <div className="space-y-6">
+      <header className="space-y-2">
+        <h1 className="text-2xl font-bold text-gray-900">Produtos, insumos e bebidas</h1>
+        <p className="text-gray-500 text-sm">
+          Separe pratos, bebidas e estoque de ingredientes e mantenha unidades de medida atualizadas.
+        </p>
+        {renderTabs()}
+      </header>
+      {content}
+    </div>
+  )
+}
+
+function TabButton({
+  label,
+  tab,
+  activeTab,
+  onClick,
+}: {
+  label: string
+  tab: TabKey
+  activeTab: TabKey
+  onClick: (tab: TabKey) => void
+}) {
+  const isActive = tab === activeTab
+  const base =
+    'px-4 py-2 rounded border text-sm font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500'
+  const classes = isActive
+    ? `${base} bg-blue-600 border-blue-600 text-white`
+    : `${base} bg-white border-gray-300 text-gray-600 hover:text-gray-800`
+
+  return (
+    <button type="button" className={classes} onClick={() => onClick(tab)}>
+      {label}
+    </button>
+  )
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block text-sm text-gray-600 space-y-1">
+      <span className="font-medium">{label}</span>
+      {children}
+    </label>
+  )
+}

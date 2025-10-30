@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=sqlite:///./data.db
+      - TENANCY_STRATEGY=column
+      - JWT_SECRET=supersecret
+      - ACCESS_TOKEN_EXPIRE_MINUTES=30
+      - REFRESH_TOKEN_EXPIRE_MINUTES=1440
+      - CORS_ORIGINS=http://localhost:5173
+      - PRIVACY_CONTACT_EMAIL=privacidade@example.com
+    volumes:
+      - ./backend/data:/app/data
+    command: bash -c "python app/seeds.py && uvicorn app.main:app --host 0.0.0.0 --port 8000"
+
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173"
+    depends_on:
+      - backend
+    environment:
+      # Base URL of the backend API. Do not append `/api` because the
+      # FastAPI routes are registered at the root. The frontend
+      # ``useApi`` hook prefixes paths automatically.
+      - VITE_API_URL=http://localhost:8000/api
+
+volumes: {}
