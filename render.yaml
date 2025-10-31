@@ -32,3 +32,13 @@ services:
         value: privacidade@example.com
       - key: CORS_ORIGINS
         value: https://SEU_DOMINIO_FRONTEND.vercel.app
+      - key: SQLALCHEMY_DISABLE_POOL
+        value: "false"
+      - key: SQLALCHEMY_POOL_SIZE
+        value: "5"
+      - key: SQLALCHEMY_MAX_OVERFLOW
+        value: "10"
+      - key: SQLALCHEMY_POOL_TIMEOUT
+        value: "30"
+      - key: SQLALCHEMY_POOL_RECYCLE
+        value: "1800"

@@ -6,6 +6,7 @@ implementadas no futuro (db ou schema) utilizando funções da classe
 """
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy.pool import NullPool
 from contextvars import ContextVar
 from typing import Generator
 
@@ -22,7 +23,18 @@ def get_engine():
     # Para SQLite, desativar check_same_thread
     if settings.DATABASE_URL.startswith("sqlite"):
         return create_engine(settings.DATABASE_URL, connect_args={"check_same_thread": False})
-    return create_engine(settings.DATABASE_URL)
+
+    pool_kwargs = {
+        "pool_pre_ping": True,
+        "pool_size": settings.SQLALCHEMY_POOL_SIZE,
+        "max_overflow": settings.SQLALCHEMY_MAX_OVERFLOW,
+        "pool_timeout": settings.SQLALCHEMY_POOL_TIMEOUT,
+        "pool_recycle": settings.SQLALCHEMY_POOL_RECYCLE,
+    }
+    if settings.SQLALCHEMY_DISABLE_POOL:
+        pool_kwargs = {"pool_pre_ping": True, "poolclass": NullPool}
+
+    return create_engine(settings.DATABASE_URL, **pool_kwargs)
 
 
 engine = get_engine()

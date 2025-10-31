@@ -1,18 +1,10 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
-import { useEffect } from 'react'
 
 const linkClasses =
   'px-3 py-2 rounded text-sm font-medium transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-500'
 
 export default function MainLayout() {
   const navigate = useNavigate()
-
-  useEffect(() => {
-    const token = localStorage.getItem('access_token')
-    if (!token) {
-      navigate('/login')
-    }
-  }, [navigate])
 
   const handleLogout = () => {
     localStorage.removeItem('access_token')

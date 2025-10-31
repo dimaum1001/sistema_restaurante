@@ -105,7 +105,7 @@ npm run dev
 2. Garanta que o arquivo `render.yaml` (na raiz do repositório) aponte para o diretório `backend` e ajuste os valores conforme necessário (principalmente `CORS_ORIGINS` com o domínio real do frontend).
 3. Faça o push para um repositório Git (GitHub, GitLab etc.) e conecte-o à Render.
 4. Ao criar o serviço, Render usará o blueprint do `render.yaml`:
-   - Provisiona um banco PostgreSQL gratuito (`restaurante-db`).
+   - Provisiona um banco PostgreSQL gratuito (`restaurante-db`). Remova esta etapa (`databases`) se utilizar Neon ou outro Postgres externo.
    - Executa `pip install -r requirements.txt` dentro do diretório backend.
    - No start da aplicação executa `alembic upgrade head` e sobe `uvicorn app.main:app` na porta `$PORT`.
 5. Após o deploy, atualize `CORS_ORIGINS` (Render → Environment) com o domínio final do frontend (ex.: `https://sua-app.vercel.app`), se ainda não o fez.
@@ -115,7 +115,8 @@ Variáveis importantes no ambiente da Render:
 
 - `DATABASE_URL`: Render injeta a string de conexão ao PostgreSQL automaticamente.
 - `JWT_SECRET`: gerado automaticamente pelo blueprint (pode ser substituído).
-- `TENANCY_STRATEGY`: mantido como `column`. Ajuste somente se alterar a estratégia.
+- `TENANCY_STRATEGY`: mantido como `column`. Ajuste somente se alterar a estrategia.
+- `SQLALCHEMY_DISABLE_POOL` e demais opcoes de pool (`SQLALCHEMY_POOL_SIZE`, `SQLALCHEMY_MAX_OVERFLOW`, `SQLALCHEMY_POOL_TIMEOUT`, `SQLALCHEMY_POOL_RECYCLE`): ajuste conforme o limite de conexoes do provedor (ex.: defina `true` para Neon free).
 - Outros (`ACCESS_TOKEN_EXPIRE_MINUTES`, `REFRESH_TOKEN_EXPIRE_MINUTES`, `PRIVACY_CONTACT_EMAIL`) podem ser customizados pelo painel.
 
 ## Testes
@@ -135,3 +136,4 @@ Os testes existentes continuam validando fluxos criticos de caixa, estoque e LGP
 - Expandir analytics com margens por categoria e previsao de demanda
 - Conectar alertas de estoque a notificacoes (e-mail, Slack, WhatsApp)
 - Acrescentar testes de integracao cobrindo os novos endpoints de analytics e inventory
+

@@ -65,7 +65,7 @@ def top_products(
     limit: int = Query(default=5, ge=1, le=20),
     db: Session = Depends(get_db_dep),
     tenant_id: str = Depends(get_tenant_id),
-    _: object = Depends(require_roles("owner", "manager", "accountant", "chef")),
+    _: object = Depends(require_roles("owner", "manager", "accountant", "chef", "cashier", "waiter")),
 ) -> list[TopProductItem]:
     """Produtos mais vendidos no período."""
     return build_top_products(db, tenant_id, start=start_date, end=end_date, limit=limit)

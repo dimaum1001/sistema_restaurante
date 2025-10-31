@@ -1,13 +1,29 @@
-import { ReactNode, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { ReactNode, useEffect, useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import api from '../../../hooks/useApi'
+
+type LocationState = {
+  pathname: string
+  search?: string
+  hash?: string
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [tenant, setTenant] = useState('demo')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
+
+  // Redireciona se o usuario ja estiver autenticado
+  useEffect(() => {
+    const token = localStorage.getItem('access_token')
+    const tenantStored = localStorage.getItem('tenant')
+    if (token && tenantStored) {
+      navigate('/', { replace: true })
+    }
+  }, [navigate])
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
@@ -24,7 +40,12 @@ export default function LoginPage() {
       localStorage.setItem('access_token', data.access_token)
       localStorage.setItem('refresh_token', data.refresh_token)
       localStorage.setItem('tenant', sanitizedTenant)
-      navigate('/')
+      const fromLocation = (location.state as { from?: LocationState } | null)?.from
+      const nextPath =
+        fromLocation?.pathname ?
+          `${fromLocation.pathname}${fromLocation.search ?? ''}${fromLocation.hash ?? ''}` :
+          '/'
+      navigate(nextPath, { replace: true })
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Falha no login')
     }

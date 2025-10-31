@@ -38,6 +38,13 @@ class Settings(BaseSettings):
     # Uvicorn
     UVICORN_WORKERS: int = 1
 
+    # Pool de conexao (importante para Postgres/Neon)
+    SQLALCHEMY_POOL_SIZE: int = 5
+    SQLALCHEMY_MAX_OVERFLOW: int = 10
+    SQLALCHEMY_POOL_TIMEOUT: int = 30
+    SQLALCHEMY_POOL_RECYCLE: int = 1800  # em segundos
+    SQLALCHEMY_DISABLE_POOL: bool = False
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @field_validator("TENANCY_STRATEGY")

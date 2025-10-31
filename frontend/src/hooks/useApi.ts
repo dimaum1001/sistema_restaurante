@@ -33,4 +33,20 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    const status = error?.response?.status
+    if (typeof window !== 'undefined' && status === 401) {
+      localStorage.removeItem('access_token')
+      localStorage.removeItem('refresh_token')
+      localStorage.removeItem('tenant')
+      if (window.location.pathname !== '/login') {
+        window.location.replace('/login')
+      }
+    }
+    return Promise.reject(error)
+  },
+)
+
 export default api

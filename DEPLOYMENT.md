@@ -12,13 +12,21 @@
 - Banco PostgreSQL vazio (Render blueprint ja cuida disso).
 - Dominios definitivos (opcional) para configurar CORS e rotas personalizadas.
 
+## Banco de dados em producao
+- **Nao use SQLite em producao:** funciona localmente, mas nao suporta concorrencia, backups nor infraestrutura multi-instancia. Migre para PostgreSQL antes de liberar para o restaurante.
+- **Render PostgreSQL:** o `render.yaml` cria automaticamente uma instancia gratuita no mesmo datacenter do backend, com latencia baixa e gestao simplificada (backup diario, rotacao de credenciais). Boa escolha se voce quer tudo na Render.
+- **Neon.tech (recomendado se precisar de escalabilidade elastica):** oferece Postgres serverless com autosleep, branching e storage separado de compute. Ideal se voce deseja isolar o banco (por exemplo, Vercel + Neon) ou precisa de restauracao rapida. Use a string `postgresql+psycopg2://...` que o Neon fornece (inclui `sslmode=require`), salve em `DATABASE_URL` e ajuste o pool:
+  - Defina `SQLALCHEMY_DISABLE_POOL=true` ou reduza `SQLALCHEMY_POOL_SIZE` para respeitar o limite de conexoes (4 no plano gratuito).
+  - Opcionalmente habilite o pooling externo do Neon (`neon-proxy`) caso tenha muitos acessos simultaneos.
+- **Backup e migracoes:** o Alembic roda automaticamente `alembic upgrade head` no startup do Render. Para Neon, rode localmente `alembic upgrade head` apontando para o banco antes do primeiro deploy (`DATABASE_URL="..." alembic upgrade head`) ou conecte uma instancia temporaria (Render job) para executar as migracoes.
+
 ## Backend no Render
 1. **Confirme dependencias**  
    O arquivo `backend/requirements.txt` inclui `psycopg2-binary`, necessario para PostgreSQL.
 
 2. **Reveja o blueprint**  
    O arquivo `render.yaml` na raiz descreve:
-   - Provisionamento do banco `restaurante-db`.
+   - Provisionamento do banco `restaurante-db` (remova a secao `databases` se usar Neon ou outro provedor).
    - Build: `pip install -r requirements.txt` dentro de `backend`.
    - Start: `alembic upgrade head` seguido de `uvicorn app.main:app --host 0.0.0.0 --port $PORT`.
    - Variaveis iniciais (`JWT_SECRET` gerado, `CORS_ORIGINS` com placeholder, etc.).
@@ -31,6 +39,8 @@
    - Atualize `CORS_ORIGINS` com o dominio definitivo do frontend (ex.: `https://sua-app.vercel.app`).
    - Confirme `JWT_SECRET` (pode gerar outro via Render se preferir).
    - Configure `UVICORN_WORKERS` se precisar de mais processos (default 1).
+   - Se estiver usando Neon, substitua `DATABASE_URL` pela conexao do Neon, defina `SQLALCHEMY_DISABLE_POOL=true` e mantenha `SSLMODE=require` na URL.
+   - Ajuste `SQLALCHEMY_POOL_SIZE`, `SQLALCHEMY_MAX_OVERFLOW`, `SQLALCHEMY_POOL_TIMEOUT` e `SQLALCHEMY_POOL_RECYCLE` conforme o limite de conexoes do seu plano.
 
 5. **Verifique**  
    - Use `https://<nome-do-servico>.onrender.com/healthz` para validar.
