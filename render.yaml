@@ -1,7 +1,3 @@
-databases:
-  - name: restaurante-db
-    databaseName: restaurante
-    plan: free
 services:
   - type: web
     name: restaurante-backend
@@ -17,9 +13,7 @@ services:
       uvicorn app.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        fromDatabase:
-          name: restaurante-db
-          property: connectionString
+        sync: false
       - key: TENANCY_STRATEGY
         value: column
       - key: JWT_SECRET
@@ -33,11 +27,11 @@ services:
       - key: CORS_ORIGINS
         value: https://SEU_DOMINIO_FRONTEND.vercel.app
       - key: SQLALCHEMY_DISABLE_POOL
-        value: "false"
+        value: "true"
       - key: SQLALCHEMY_POOL_SIZE
-        value: "5"
+        value: "2"
       - key: SQLALCHEMY_MAX_OVERFLOW
-        value: "10"
+        value: "2"
       - key: SQLALCHEMY_POOL_TIMEOUT
         value: "30"
       - key: SQLALCHEMY_POOL_RECYCLE
