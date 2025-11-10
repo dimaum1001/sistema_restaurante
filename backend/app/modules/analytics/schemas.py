@@ -36,6 +36,14 @@ class SalesPeriodEntry(BaseModel):
     total_orders: int
     total_revenue: float
     average_ticket: float
+    products: List[TopProductItem]
+
+
+class SalesPeriodicSummary(BaseModel):
+    total_orders: int
+    total_revenue: float
+    average_ticket: float
+    products: List[TopProductItem]
 
 
 class SalesPeriodicReport(BaseModel):
@@ -43,6 +51,7 @@ class SalesPeriodicReport(BaseModel):
     start: date
     end: date
     entries: List[SalesPeriodEntry]
+    summary: SalesPeriodicSummary
 
 
 class SalesFilters(BaseModel):

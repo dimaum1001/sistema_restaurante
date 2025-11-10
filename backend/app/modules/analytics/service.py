@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timedelta
 from typing import Dict, List, Tuple
 
 from sqlalchemy import func
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from ...models.order import (
     Order,
@@ -20,6 +20,7 @@ from .schemas import (
     SalesDailyOverview,
     SalesPeriodicReport,
     SalesPeriodEntry,
+    SalesPeriodicSummary,
     TopProductItem,
 )
 
@@ -158,7 +159,8 @@ def build_periodic_report(
 ) -> SalesPeriodicReport:
     start_dt, end_dt, start_date, end_date = _normalize_start_end(start, end)
     orders = (
-        db.query(Order.closed_at, Order.total)
+        db.query(Order)
+        .options(selectinload(Order.items).selectinload(OrderItem.product))
         .filter(
             Order.tenant_id == tenant_id,
             Order.status == OrderStatus.PAID,
@@ -169,10 +171,14 @@ def build_periodic_report(
     )
 
     buckets: Dict[str, Dict[str, object]] = {}
-    for closed_at, total in orders:
-        if not closed_at:
+    summary_products: Dict[int, Dict[str, float | str]] = {}
+    summary_total = 0.0
+    summary_count = 0
+
+    for order in orders:
+        if not order.closed_at:
             continue
-        period_start, period_end, label = _compute_period_boundaries(closed_at.date(), granularity)
+        period_start, period_end, label = _compute_period_boundaries(order.closed_at.date(), granularity)
         bucket = buckets.setdefault(
             label,
             {
@@ -180,16 +186,55 @@ def build_periodic_report(
                 "end": period_end,
                 "total": 0.0,
                 "count": 0,
+                "products": {},
             },
         )
-        bucket["total"] = float(bucket["total"]) + float(total or 0.0)
+        bucket["total"] = float(bucket["total"]) + float(order.total or 0.0)
         bucket["count"] = int(bucket["count"]) + 1
+        summary_total += float(order.total or 0.0)
+        summary_count += 1
+
+        for item in order.items:
+            product = getattr(item, "product", None)
+            product_id = item.product_id
+            product_name = product.name if product else f"Produto #{product_id}"
+            quantity = float(item.quantity or 0.0)
+            unit_price = item.unit_price
+            if unit_price is None and product is not None:
+                unit_price = product.sale_price
+            revenue = float(unit_price or 0.0) * quantity
+
+            bucket_products: Dict[int, Dict[str, float | str]] = bucket["products"]  # type: ignore[assignment]
+            product_slot = bucket_products.setdefault(
+                product_id,
+                {"name": product_name, "quantity": 0.0, "revenue": 0.0},
+            )
+            product_slot["quantity"] = float(product_slot["quantity"]) + quantity  # type: ignore[index]
+            product_slot["revenue"] = float(product_slot["revenue"]) + revenue  # type: ignore[index]
+
+            summary_slot = summary_products.setdefault(
+                product_id,
+                {"name": product_name, "quantity": 0.0, "revenue": 0.0},
+            )
+            summary_slot["quantity"] = float(summary_slot["quantity"]) + quantity  # type: ignore[index]
+            summary_slot["revenue"] = float(summary_slot["revenue"]) + revenue  # type: ignore[index]
 
     entries: List[SalesPeriodEntry] = []
     for label, data in buckets.items():
         total_value = float(data["total"])
         count_value = int(data["count"])
         average_ticket = total_value / count_value if count_value else 0.0
+        products_dict: Dict[int, Dict[str, float | str]] = data["products"]  # type: ignore[assignment]
+        products = [
+            TopProductItem(
+                product_id=product_id,
+                name=str(values["name"]),
+                quantity_sold=float(values["quantity"]),
+                revenue=float(values["revenue"]),
+            )
+            for product_id, values in products_dict.items()
+        ]
+        products.sort(key=lambda item: item.revenue, reverse=True)
         entries.append(
             SalesPeriodEntry(
                 label=label,
@@ -198,16 +243,36 @@ def build_periodic_report(
                 total_orders=count_value,
                 total_revenue=total_value,
                 average_ticket=average_ticket,
+                products=products,
             )
         )
 
-    entries.sort(key=lambda item: item.start)
+    entries.sort(key=lambda item: item.start, reverse=True)
+
+    summary_products_list = [
+        TopProductItem(
+            product_id=product_id,
+            name=str(values["name"]),
+            quantity_sold=float(values["quantity"]),
+            revenue=float(values["revenue"]),
+        )
+        for product_id, values in summary_products.items()
+    ]
+    summary_products_list.sort(key=lambda item: item.revenue, reverse=True)
+
+    summary = SalesPeriodicSummary(
+        total_orders=summary_count,
+        total_revenue=summary_total,
+        average_ticket=(summary_total / summary_count) if summary_count else 0.0,
+        products=summary_products_list,
+    )
 
     return SalesPeriodicReport(
         granularity=granularity,
         start=start_date,
         end=end_date,
         entries=entries,
+        summary=summary,
     )
 
 

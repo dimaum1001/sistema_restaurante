@@ -57,7 +57,14 @@ def list_moves(
     tenant_id: str = Depends(get_tenant_id),
     user = Depends(require_roles("owner", "manager", "purchasing", "chef")),
 ):
-    moves = db.query(StockMove).filter(StockMove.tenant_id == tenant_id).offset(skip).limit(limit).all()
+    moves = (
+        db.query(StockMove)
+        .filter(StockMove.tenant_id == tenant_id)
+        .order_by(StockMove.created_at.desc())
+        .offset(skip)
+        .limit(limit)
+        .all()
+    )
     return moves
 
 

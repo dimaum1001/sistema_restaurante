@@ -3,7 +3,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from ...api.deps import get_db_dep, get_tenant_id, require_roles
+from ...api.deps import get_db_dep, get_tenant_id, require_roles, get_current_user
 from ...models.product import Product, ProductType, Unit, Recipe, RecipeItem
 from ...schemas.products import (
     ProductCreate,
@@ -35,6 +35,7 @@ def create_unit(
 def list_units(
     db: Session = Depends(get_db_dep),
     tenant_id: str = Depends(get_tenant_id),
+    _: object = Depends(get_current_user),
 ):
     units = db.query(Unit).filter(Unit.tenant_id == tenant_id).all()
     return units
@@ -74,6 +75,7 @@ def list_products(
     stockable: bool = Query(default=False, description="Quando verdadeiro, retorna ingredientes e mercadorias."),
     db: Session = Depends(get_db_dep),
     tenant_id: str = Depends(get_tenant_id),
+    _: object = Depends(get_current_user),
 ):
     query = db.query(Product).filter(Product.tenant_id == tenant_id)
     if stockable:
@@ -93,6 +95,7 @@ def get_product(
     product_id: int,
     db: Session = Depends(get_db_dep),
     tenant_id: str = Depends(get_tenant_id),
+    _: object = Depends(get_current_user),
 ):
     product = db.query(Product).filter(Product.id == product_id, Product.tenant_id == tenant_id).first()
     if not product:
@@ -147,6 +150,7 @@ def get_recipe(
     product_id: int,
     db: Session = Depends(get_db_dep),
     tenant_id: str = Depends(get_tenant_id),
+    _: object = Depends(get_current_user),
 ):
     recipe = db.query(Recipe).filter(Recipe.product_id == product_id, Recipe.tenant_id == tenant_id).first()
     if not recipe:
