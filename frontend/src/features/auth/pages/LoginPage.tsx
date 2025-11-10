@@ -52,9 +52,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
-      <form onSubmit={handleSubmit} className="bg-white p-8 rounded shadow w-full max-w-sm space-y-4">
-        <div className="text-center">
+    <div className="flex min-h-screen items-center justify-center px-4">
+      <form onSubmit={handleSubmit} className="glass-panel w-full max-w-sm space-y-4 p-8">
+        <div className="text-center space-y-2">
+          <span className="section-pill">Console seguro</span>
           <h1 className="text-2xl font-bold text-gray-900">Bem-vindo</h1>
           <p className="text-sm text-gray-500">Acesse com seu tenant e credenciais provisionadas.</p>
         </div>
@@ -64,7 +65,7 @@ export default function LoginPage() {
             type="text"
             value={tenant}
             onChange={(event) => setTenant(event.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input-soft"
             required
           />
         </InputField>
@@ -73,7 +74,7 @@ export default function LoginPage() {
             type="text"
             value={username}
             onChange={(event) => setUsername(event.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input-soft"
             required
           />
         </InputField>
@@ -82,13 +83,13 @@ export default function LoginPage() {
             type="password"
             value={password}
             onChange={(event) => setPassword(event.target.value)}
-            className="w-full border rounded px-3 py-2"
+            className="input-soft"
             required
           />
         </InputField>
         <button
           type="submit"
-          className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded transition"
+          className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110"
         >
           Entrar
         </button>

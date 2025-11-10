@@ -51,36 +51,37 @@ export default function SalesReportsPage() {
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Relatórios Analíticos</h1>
-          <p className="text-gray-500">
-            Compare períodos distintos para acompanhar tendências, sazonalidade e oscilações de ticket médio.
+      <header className="glass-panel flex flex-col gap-4 rounded-2xl p-6 md:flex-row md:items-end md:justify-between">
+        <div className="space-y-2">
+          <span className="section-pill">Relatórios inteligentes</span>
+          <h1 className="text-3xl font-semibold text-slate-900">Performance comparativa</h1>
+          <p className="text-sm text-slate-500">
+            Explore tendências, sazonalidade e ticket médio por período para direcionar promoções e metas.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          <label className="flex flex-col text-gray-600">
+        <div className="flex w-full flex-col gap-3 text-sm sm:flex-row sm:flex-wrap sm:items-end">
+          <label className="flex w-full flex-col text-gray-600 sm:w-auto">
             <span className="mb-1 font-medium">Início</span>
             <input
-              className="border border-gray-300 rounded px-3 py-2 text-gray-900"
+              className="input-soft"
               type="date"
               value={startDate}
               onChange={(event) => setStartDate(event.target.value)}
             />
           </label>
-          <label className="flex flex-col text-gray-600">
+          <label className="flex w-full flex-col text-gray-600 sm:w-auto">
             <span className="mb-1 font-medium">Fim</span>
             <input
-              className="border border-gray-300 rounded px-3 py-2 text-gray-900"
+              className="input-soft"
               type="date"
               value={endDate}
               onChange={(event) => setEndDate(event.target.value)}
             />
           </label>
-          <label className="flex flex-col text-gray-600">
+          <label className="flex w-full flex-col text-gray-600 sm:w-auto">
             <span className="mb-1 font-medium">Agrupamento</span>
             <select
-              className="border border-gray-300 rounded px-3 py-2 text-gray-900"
+              className="input-soft"
               value={granularity}
               onChange={(event) => setGranularity(event.target.value as Granularity)}
             >
@@ -96,39 +97,45 @@ export default function SalesReportsPage() {
       {isError && <div>Não foi possível carregar os dados de relatórios.</div>}
 
       {data && (
-        <section className="bg-white shadow rounded overflow-hidden">
-          <table className="min-w-full text-sm text-left">
-            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3 font-medium">Período</th>
-                <th className="px-4 py-3 font-medium">Pedidos</th>
-                <th className="px-4 py-3 font-medium">Faturamento</th>
-                <th className="px-4 py-3 font-medium">Ticket médio</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-gray-700">
-              {data.entries.length === 0 && (
+        <section className="table-shell">
+          <div className="overflow-x-auto">
+            <table className="min-w-[36rem] w-full text-left text-sm">
+              <thead>
                 <tr>
-                  <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
-                    Nenhum dado encontrado para os filtros selecionados.
-                  </td>
+                  <th className="px-4 py-3 font-medium">Período</th>
+                  <th className="px-4 py-3 font-medium">Pedidos</th>
+                  <th className="px-4 py-3 font-medium">Faturamento</th>
+                  <th className="px-4 py-3 font-medium">Ticket médio</th>
                 </tr>
-              )}
-              {data.entries.map((entry) => (
-                <tr key={entry.label}>
-                  <td className="px-4 py-3">
-                    <p className="font-semibold">{entry.label}</p>
-                    <p className="text-xs text-gray-400">
-                      {formatDate(entry.start)} a {formatDate(entry.end)}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3">{entry.total_orders}</td>
-                  <td className="px-4 py-3">{currencyFormatter.format(entry.total_revenue)}</td>
-                  <td className="px-4 py-3">{currencyFormatter.format(entry.average_ticket)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100 text-gray-700">
+                {data.entries.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
+                      Nenhum dado encontrado para os filtros selecionados.
+                    </td>
+                  </tr>
+                )}
+                {data.entries.map((entry) => (
+                  <tr key={entry.label}>
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900">{entry.label}</p>
+                      <p className="text-xs text-slate-500">
+                        {formatDate(entry.start)} a {formatDate(entry.end)}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">{entry.total_orders}</td>
+                    <td className="px-4 py-3 font-semibold text-slate-900">
+                      {currencyFormatter.format(entry.total_revenue)}
+                    </td>
+                    <td className="px-4 py-3 text-slate-700">
+                      {currencyFormatter.format(entry.average_ticket)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </section>
       )}
     </div>

@@ -417,7 +417,7 @@ export default function ProductsPage() {
   }
 
   const renderTabs = () => (
-    <div className="flex flex-wrap gap-2">
+    <div className="flex flex-wrap gap-2 overflow-x-auto pb-1">
       <TabButton label="Pratos" tab="dishes" activeTab={activeTab} onClick={setActiveTab} />
       <TabButton label="Insumos" tab="ingredients" activeTab={activeTab} onClick={setActiveTab} />
       <TabButton label="Bebidas" tab="beverages" activeTab={activeTab} onClick={setActiveTab} />
@@ -427,8 +427,8 @@ export default function ProductsPage() {
 
   const renderDishPanel = () => (
     <div className="space-y-6">
-      <form onSubmit={handleSubmitDish} className="bg-white p-6 rounded shadow space-y-3">
-        <div className="flex items-center justify-between">
+      <form onSubmit={handleSubmitDish} className="glass-panel p-6 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-800">
             {dishEditingId ? 'Editar prato' : 'Cadastrar prato'}
           </h2>
@@ -485,74 +485,76 @@ export default function ProductsPage() {
         <button
           type="submit"
           disabled={productsMutation.isPending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {productsMutation.isPending ? 'Salvando...' : dishEditingId ? 'Atualizar prato' : 'Adicionar prato'}
         </button>
       </form>
 
-      <section className="bg-white rounded shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section className="glass-panel overflow-hidden">
+        <div className="px-4 py-4 flex flex-col gap-3 border-b border-white/40 md:flex-row md:items-center md:justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Pratos cadastrados</h3>
           <input
             type="search"
             value={dishSearch}
             onChange={(event) => setDishSearch(event.target.value)}
             placeholder="Buscar prato..."
-            className="w-full md:w-64 border rounded px-3 py-2 text-sm"
+            className="input-soft md:w-64"
           />
         </div>
         {dishesQuery.isLoading ? (
           <div className="p-4 text-sm text-gray-500">Carregando pratos...</div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">Prato</th>
-                <th className="px-4 py-3 text-left font-medium">Unidade</th>
-                <th className="px-4 py-3 text-right font-medium">Preco</th>
-                <th className="px-4 py-3 text-right font-medium">Acoes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {filteredDishes.map((dish) => (
-                <tr key={dish.id} className={dishEditingId === dish.id ? 'bg-blue-50/50' : ''}>
-                  <td className="px-4 py-3 font-medium text-gray-900">{dish.name}</td>
-                  <td className="px-4 py-3 text-gray-600">
-                    {dish.unit ? `${dish.unit.name} (${dish.unit.abbreviation})` : 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-right text-gray-800">
-                    {dish.sale_price !== undefined ? `R$ ${dish.sale_price.toFixed(2)}` : 'N/A'}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-3">
-                      <button
-                        className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
-                        onClick={() => handleDishEdit(dish)}
-                      >
-                        Editar
-                      </button>
-                      <button
-                        className="text-sm text-red-600 hover:text-red-700"
-                        onClick={() => handleDeleteProduct(dish.id, 'dishes')}
-                      >
-                        Excluir
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-              {filteredDishes.length === 0 && (
+          <div className="overflow-x-auto">
+            <table className="min-w-[40rem] w-full text-sm">
+              <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-gray-500">
                 <tr>
-                  <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
-                    {orderedDishes.length === 0
-                      ? 'Nenhum prato cadastrado ainda.'
-                      : 'Nenhum prato encontrado para a busca.'}
-                  </td>
+                  <th className="px-4 py-3 text-left font-medium">Prato</th>
+                  <th className="px-4 py-3 text-left font-medium">Unidade</th>
+                  <th className="px-4 py-3 text-right font-medium">Preco</th>
+                  <th className="px-4 py-3 text-right font-medium">Acoes</th>
                 </tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/60">
+                {filteredDishes.map((dish) => (
+                  <tr key={dish.id} className={dishEditingId === dish.id ? 'bg-blue-50/50' : ''}>
+                    <td className="px-4 py-3 font-medium text-gray-900">{dish.name}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {dish.unit ? `${dish.unit.name} (${dish.unit.abbreviation})` : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-right text-gray-800">
+                      {dish.sale_price !== undefined ? `R$ ${dish.sale_price.toFixed(2)}` : 'N/A'}
+                    </td>
+                    <td className="px-4 py-3 text-right">
+                      <div className="flex items-center justify-end gap-3">
+                        <button
+                          className="text-sm text-blue-600 hover:text-blue-700 font-semibold"
+                          onClick={() => handleDishEdit(dish)}
+                        >
+                          Editar
+                        </button>
+                        <button
+                          className="text-sm text-red-600 hover:text-red-700"
+                          onClick={() => handleDeleteProduct(dish.id, 'dishes')}
+                        >
+                          Excluir
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredDishes.length === 0 && (
+                  <tr>
+                    <td className="px-4 py-4 text-center text-gray-500" colSpan={4}>
+                      {orderedDishes.length === 0
+                        ? 'Nenhum prato cadastrado ainda.'
+                        : 'Nenhum prato encontrado para a busca.'}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
@@ -560,8 +562,8 @@ export default function ProductsPage() {
 
   const renderIngredientPanel = () => (
     <div className="space-y-6">
-      <form onSubmit={handleSubmitIngredient} className="bg-white p-6 rounded shadow space-y-3">
-        <div className="flex items-center justify-between">
+      <form onSubmit={handleSubmitIngredient} className="glass-panel p-6 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-800">
             {ingredientEditingId ? 'Editar insumo' : 'Cadastrar insumo'}
           </h2>
@@ -614,36 +616,37 @@ export default function ProductsPage() {
         <button
           type="submit"
           disabled={productsMutation.isPending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {productsMutation.isPending ? 'Salvando...' : ingredientEditingId ? 'Atualizar insumo' : 'Adicionar insumo'}
         </button>
       </form>
 
-      <section className="bg-white rounded shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section className="glass-panel overflow-hidden">
+        <div className="px-4 py-4 flex flex-col gap-3 border-b border-white/40 md:flex-row md:items-center md:justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Insumos cadastrados</h3>
           <input
             type="search"
             value={ingredientSearch}
             onChange={(event) => setIngredientSearch(event.target.value)}
             placeholder="Buscar insumo..."
-            className="w-full md:w-64 border rounded px-3 py-2 text-sm"
+            className="input-soft md:w-64"
           />
         </div>
         {ingredientsQuery.isLoading ? (
           <div className="p-4 text-sm text-gray-500">Carregando insumos...</div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
-              <tr>
-                <th className="px-4 py-3 text-left font-medium">Insumo</th>
-                <th className="px-4 py-3 text-left font-medium">Unidade</th>
-                <th className="px-4 py-3 text-right font-medium">Custo</th>
-                <th className="px-4 py-3 text-right font-medium">Acoes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
+          <div className="overflow-x-auto">
+            <table className="min-w-[40rem] w-full text-sm">
+              <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-gray-500">
+                <tr>
+                  <th className="px-4 py-3 text-left font-medium">Insumo</th>
+                  <th className="px-4 py-3 text-left font-medium">Unidade</th>
+                  <th className="px-4 py-3 text-right font-medium">Custo</th>
+                  <th className="px-4 py-3 text-right font-medium">Acoes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/60">
               {filteredIngredients.map((ingredient) => (
                 <tr key={ingredient.id} className={ingredientEditingId === ingredient.id ? 'bg-blue-50/50' : ''}>
                   <td className="px-4 py-3 font-medium text-gray-900">{ingredient.name}</td>
@@ -680,8 +683,9 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
@@ -689,8 +693,8 @@ export default function ProductsPage() {
 
   const renderBeveragePanel = () => (
     <div className="space-y-6">
-      <form onSubmit={handleSubmitBeverage} className="bg-white p-6 rounded shadow space-y-3">
-        <div className="flex items-center justify-between">
+      <form onSubmit={handleSubmitBeverage} className="glass-panel p-6 space-y-4">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-lg font-semibold text-gray-800">
             {beverageEditingId ? 'Editar bebida' : 'Cadastrar bebida'}
           </h2>
@@ -747,28 +751,29 @@ export default function ProductsPage() {
         <button
           type="submit"
           disabled={productsMutation.isPending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {productsMutation.isPending ? 'Salvando...' : beverageEditingId ? 'Atualizar bebida' : 'Adicionar bebida'}
         </button>
       </form>
 
-      <section className="bg-white rounded shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+      <section className="glass-panel overflow-hidden">
+        <div className="px-4 py-4 flex flex-col gap-3 border-b border-white/40 md:flex-row md:items-center md:justify-between">
           <h3 className="text-lg font-semibold text-gray-800">Bebidas cadastradas</h3>
           <input
             type="search"
             value={beverageSearch}
             onChange={(event) => setBeverageSearch(event.target.value)}
             placeholder="Buscar bebida..."
-            className="w-full md:w-64 border rounded px-3 py-2 text-sm"
+            className="input-soft md:w-64"
           />
         </div>
         {beveragesQuery.isLoading ? (
           <div className="p-4 text-sm text-gray-500">Carregando bebidas...</div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+          <div className="overflow-x-auto">
+            <table className="min-w-[40rem] w-full text-sm">
+              <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Bebida</th>
                 <th className="px-4 py-3 text-left font-medium">Unidade</th>
@@ -776,7 +781,7 @@ export default function ProductsPage() {
                 <th className="px-4 py-3 text-right font-medium">Acoes</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-white/60">
               {filteredBeverages.map((beverage) => (
                 <tr key={beverage.id} className={beverageEditingId === beverage.id ? 'bg-blue-50/50' : ''}>
                   <td className="px-4 py-3 font-medium text-gray-900">{beverage.name}</td>
@@ -813,8 +818,9 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
@@ -822,7 +828,7 @@ export default function ProductsPage() {
 
   const renderUnitPanel = () => (
     <div className="space-y-6">
-      <form onSubmit={handleSubmitUnit} className="bg-white p-6 rounded shadow space-y-3">
+      <form onSubmit={handleSubmitUnit} className="glass-panel p-6 space-y-4">
         <h2 className="text-lg font-semibold text-gray-800">Cadastrar unidade de medida</h2>
         {unitError && <div className="text-sm text-red-500">{unitError}</div>}
         {unitSuccess && <div className="text-sm text-green-600">{unitSuccess}</div>}
@@ -847,27 +853,28 @@ export default function ProductsPage() {
         <button
           type="submit"
           disabled={unitMutation.isPending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          className="rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {unitMutation.isPending ? 'Salvando...' : 'Cadastrar unidade'}
         </button>
       </form>
 
-      <section className="bg-white rounded shadow overflow-hidden">
-        <div className="px-4 py-3 border-b border-gray-100">
+      <section className="glass-panel overflow-hidden">
+        <div className="px-4 py-4 border-b border-white/40">
           <h3 className="text-lg font-semibold text-gray-800">Unidades cadastradas</h3>
         </div>
         {unitsQuery.isLoading ? (
           <div className="p-4 text-sm text-gray-500">Carregando unidades...</div>
         ) : (
-          <table className="min-w-full text-sm">
-            <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+          <div className="overflow-x-auto">
+            <table className="min-w-[28rem] w-full text-sm">
+              <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-gray-500">
               <tr>
                 <th className="px-4 py-3 text-left font-medium">Nome</th>
                 <th className="px-4 py-3 text-left font-medium">Abreviacao</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-100">
+              <tbody className="divide-y divide-white/60">
               {orderedUnits.map((unit) => (
                 <tr key={unit.id}>
                   <td className="px-4 py-3 text-gray-800">{unit.name}</td>
@@ -881,8 +888,9 @@ export default function ProductsPage() {
                   </td>
                 </tr>
               )}
-            </tbody>
-          </table>
+              </tbody>
+            </table>
+          </div>
         )}
       </section>
     </div>
@@ -900,12 +908,15 @@ export default function ProductsPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <header className="space-y-2">
-        <h1 className="text-2xl font-bold text-gray-900">Produtos, insumos e bebidas</h1>
-        <p className="text-gray-500 text-sm">
-          Separe pratos, bebidas e estoque de ingredientes e mantenha unidades de medida atualizadas.
-        </p>
+    <div className="space-y-8">
+      <header className="glass-panel space-y-4 p-6">
+        <div className="space-y-2">
+          <span className="section-pill">Catálogo vivo</span>
+          <h1 className="text-3xl font-semibold text-gray-900">Produtos, insumos e bebidas</h1>
+          <p className="text-sm text-gray-500">
+            Cadastre receitas, controle custos e mantenha unidades alinhadas para todo o time.
+          </p>
+        </div>
         {renderTabs()}
       </header>
       {content}

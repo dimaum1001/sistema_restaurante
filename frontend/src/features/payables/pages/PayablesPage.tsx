@@ -94,21 +94,22 @@ export default function PayablesPage() {
   )
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-gray-900">Contas a pagar</h1>
+    <div className="space-y-8">
+      <header className="glass-panel space-y-2 p-6">
+        <span className="section-pill">Backoffice</span>
+        <h1 className="text-3xl font-semibold text-gray-900">Contas a pagar</h1>
         <p className="text-sm text-gray-500">
           Controle despesas recorrentes como agua, luz, aluguel e outros custos administrativos.
         </p>
       </header>
 
-      <form onSubmit={handleSubmit} className="bg-white p-6 rounded shadow space-y-3">
+      <form onSubmit={handleSubmit} className="glass-panel space-y-4 p-6">
         <h2 className="text-lg font-semibold text-gray-800">Nova despesa</h2>
         {error && <div className="text-sm text-red-500">{error}</div>}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Field label="Descricao">
             <input
-              className="w-full border rounded px-3 py-2"
+              className="input-soft"
               value={form.description}
               onChange={(event) => setForm({ ...form, description: event.target.value })}
               placeholder="Ex.: Conta de luz"
@@ -116,7 +117,7 @@ export default function PayablesPage() {
           </Field>
           <Field label="Valor">
             <input
-              className="w-full border rounded px-3 py-2"
+              className="input-soft"
               type="number"
               step="0.01"
               min="0"
@@ -127,7 +128,7 @@ export default function PayablesPage() {
           </Field>
           <Field label="Vencimento">
             <input
-              className="w-full border rounded px-3 py-2"
+              className="input-soft"
               type="date"
               value={form.due_date}
               onChange={(event) => setForm({ ...form, due_date: event.target.value })}
@@ -138,13 +139,13 @@ export default function PayablesPage() {
         <button
           type="submit"
           disabled={createMutation.isPending}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+          className="rounded-2xl bg-gradient-to-r from-blue-600 to-sky-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
         >
           {createMutation.isPending ? 'Salvando...' : 'Cadastrar despesa'}
         </button>
       </form>
 
-      <section className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:items-start">
         <PayablesTable
           title="Em aberto"
           emptyMessage="Nenhuma despesa em aberto."
@@ -193,8 +194,9 @@ function PayablesTable({
       <div className="px-4 py-3 border-b border-gray-100">
         <h2 className="text-lg font-semibold text-gray-800">{title}</h2>
       </div>
-      <table className="min-w-full text-sm">
-        <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+      <div className="overflow-x-auto">
+        <table className="min-w-[34rem] w-full text-sm">
+          <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-gray-500">
           <tr>
             <th className="px-4 py-3 text-left font-medium">Vencimento</th>
             <th className="px-4 py-3 text-left font-medium">Descricao</th>
@@ -202,7 +204,7 @@ function PayablesTable({
             <th className="px-4 py-3 text-right font-medium">Acao</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-white/60">
           {data.map((item) => (
             <tr key={item.id}>
               <td className="px-4 py-3 text-gray-600">{new Date(item.due_date).toLocaleDateString('pt-BR')}</td>
@@ -239,8 +241,9 @@ function PayablesTable({
               </td>
             </tr>
           )}
-        </tbody>
-      </table>
+          </tbody>
+        </table>
+      </div>
     </div>
   )
 }

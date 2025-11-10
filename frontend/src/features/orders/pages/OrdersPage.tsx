@@ -393,19 +393,20 @@ export default function OrdersPage() {
   const canPay = !!order && !payOrderMutation.isPending
 
   return (
-    <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-bold text-gray-900">PDV a la carte</h1>
+    <div className="space-y-8">
+      <header className="glass-panel space-y-2 p-6">
+        <span className="section-pill">Frente de caixa</span>
+        <h1 className="text-3xl font-semibold text-gray-900">PDV a la carte</h1>
         <p className="text-sm text-gray-500">
-          Adicione apenas os pratos vendidos. Os acompanhamentos padrao (salada, arroz, feijao) sao abatidos do estoque automaticamente.
+          Adicione pratos e bebidas em poucos toques. Os acompanhamentos padrao são baixados automaticamente do estoque.
         </p>
       </header>
 
       {error && <div className="text-red-500 text-sm">{error}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <section className="bg-white rounded shadow flex flex-col">
-          <div className="border-b px-4 py-3 space-y-3">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:items-start">
+        <section className="glass-panel flex flex-col">
+          <div className="border-b border-white/40 px-4 py-4 space-y-3">
             <div>
               <h2 className="font-semibold text-gray-800">Itens disponiveis</h2>
               <p className="text-xs text-gray-500">
@@ -421,7 +422,7 @@ export default function OrdersPage() {
                   setQuickView(null)
                 }
               }}
-              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+              className="input-soft"
             />
             {searchTerm.trim().length === 0 && (
               <div className="flex flex-wrap gap-2 text-xs">
@@ -502,8 +503,8 @@ export default function OrdersPage() {
           </div>
         </section>
 
-        <section className="bg-white rounded shadow flex flex-col">
-          <div className="border-b px-4 py-3 flex items-center justify-between">
+        <section className="glass-panel flex flex-col">
+          <div className="border-b border-white/40 px-4 py-4 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
             <h2 className="font-semibold text-gray-800">Carrinho</h2>
             <span className="text-sm text-gray-500">{items.length} item(s)</span>
           </div>
@@ -513,12 +514,15 @@ export default function OrdersPage() {
             ) : (
               <ul className="divide-y divide-gray-100">
                 {items.map((item) => (
-                  <li key={item.product_id} className="px-4 py-3 flex items-center justify-between">
+                  <li
+                    key={item.product_id}
+                    className="px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                  >
                     <div>
                       <p className="font-medium text-gray-800">{item.name}</p>
                       <p className="text-xs text-gray-400">R$ {item.price.toFixed(2)} cada</p>
                     </div>
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-wrap items-center gap-3">
                       <div className="flex items-center border rounded">
                         <button
                           onClick={() => decrement(item.product_id)}
@@ -575,7 +579,7 @@ export default function OrdersPage() {
             </div>
           )}
           <div className="border-t px-4 py-3 space-y-3">
-            <div className="flex items-center justify-between text-gray-700">
+            <div className="flex flex-col gap-1 text-gray-700 sm:flex-row sm:items-center sm:justify-between">
               <span>Total do pedido</span>
               <span className="text-lg font-semibold">R$ {total.toFixed(2)}</span>
             </div>
@@ -599,7 +603,7 @@ export default function OrdersPage() {
                 <button
                   onClick={() => payOrderMutation.mutate()}
                   disabled={!canPay}
-                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded transition"
+                  className="w-full rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
                 >
                   {payOrderMutation.isPending ? 'Processando...' : 'Confirmar pagamento'}
                 </button>
@@ -610,7 +614,7 @@ export default function OrdersPage() {
               <button
                 onClick={() => createOrderMutation.mutate()}
                 disabled={!canGenerateOrder}
-                className="w-full bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded transition"
+                className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-lime-500 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-emerald-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {createOrderMutation.isPending ? 'Gerando...' : 'Gerar pedido'}
               </button>
@@ -620,7 +624,7 @@ export default function OrdersPage() {
               <button
                 onClick={clearCart}
                 type="button"
-                className="w-full text-sm text-gray-500 hover:text-gray-700"
+                className="w-full text-sm font-semibold text-gray-400 transition hover:text-gray-700"
               >
                 Limpar carrinho
               </button>
@@ -660,7 +664,7 @@ function CategoryList({
             return (
               <li
                 key={product.id}
-                className={`px-4 py-3 flex items-center justify-between transition ${
+                className={`px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between transition ${
                   highlightLabel ? 'bg-amber-50/80 ring-1 ring-amber-200' : 'hover:bg-gray-50'
                 }`}
               >
@@ -711,7 +715,7 @@ function QuickSuggestionList({
           {items.map((item, index) => (
             <li
               key={item.id}
-              className="px-4 py-3 flex items-center justify-between hover:bg-amber-100"
+              className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between hover:bg-amber-100"
             >
               <div>
                 <p className="font-medium text-gray-800">{item.name}</p>
@@ -745,7 +749,7 @@ function SearchResults({
   const totalResults = results.length
   return (
     <div className="rounded border border-gray-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-4 py-2 bg-gray-50 text-xs font-semibold uppercase tracking-wide text-gray-600">
         <span>
           {totalResults} resultado{totalResults === 1 ? '' : 's'}
         </span>
@@ -767,7 +771,7 @@ function SearchResults({
             return (
               <li
                 key={product.id}
-                className="px-4 py-3 flex items-center justify-between hover:bg-gray-50"
+                className="px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between hover:bg-gray-50"
               >
                 <div>
                   <p className="font-medium text-gray-800">{product.name}</p>

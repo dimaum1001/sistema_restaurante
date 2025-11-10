@@ -71,15 +71,18 @@ const topProducts = useMemo(
 
   return (
     <div className="space-y-8">
-      <header className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Visão Geral das Vendas</h1>
-          <p className="text-gray-500">Métricas consolidadas do dia selecionado para apoio às decisões em tempo real.</p>
+      <header className="flex flex-col gap-4 rounded-2xl border border-slate-200/70 bg-white/80 p-5 shadow-xl shadow-slate-900/5 sm:flex-row sm:items-end sm:justify-between">
+        <div className="space-y-2">
+          <span className="section-pill">Analytics em tempo real</span>
+          <h1 className="text-3xl font-semibold text-slate-900">Vendas do dia</h1>
+          <p className="text-sm text-slate-500">
+            Monitore faturamento, abasteça o time de salão e antecipe decisões com indicadores sempre atualizados.
+          </p>
         </div>
-        <label className="flex items-center gap-2 text-sm">
-          <span className="font-medium text-gray-600">Data:</span>
+        <label className="flex w-full flex-col gap-2 text-sm text-gray-600 sm:w-auto sm:flex-row sm:items-center sm:gap-3">
+          <span className="font-semibold text-slate-600">Data</span>
           <input
-            className="border border-gray-300 rounded px-3 py-2 text-gray-900"
+            className="input-soft sm:w-48"
             type="date"
             value={selectedDate}
             onChange={(event) => setSelectedDate(event.target.value)}
@@ -87,44 +90,57 @@ const topProducts = useMemo(
         </label>
       </header>
 
-      <section className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+      <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <KpiCard title="Faturamento" value={currencyFormatter.format(data.total_revenue)} />
         <KpiCard title="Pedidos pagos" value={data.total_orders.toString()} />
         <KpiCard title="Ticket médio" value={currencyFormatter.format(data.average_ticket)} />
         <KpiCard title="Clientes atendidos" value={data.customers_served.toString()} />
       </section>
 
-      <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white shadow rounded p-6">
-          <h2 className="text-lg font-semibold mb-4 text-gray-800">Mix de Pagamentos</h2>
-          <div className="space-y-3">
+      <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="glass-panel p-6">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Mix de pagamentos</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Saldo consolidado</p>
+            </div>
+            <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-semibold text-slate-500">Financeiro</span>
+          </div>
+          <div className="mt-4 space-y-3">
             {paymentMix.length === 0 && <p className="text-sm text-gray-500">Ainda não há lançamentos para o período.</p>}
             {paymentMix.map((item) => (
-              <div key={item.method} className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-700 capitalize">{translatePayment(item.method)}</p>
-                  <p className="text-xs text-gray-400">{item.percentage.toFixed(1)}% do faturamento</p>
+              <div key={item.method} className="flex items-center justify-between rounded-2xl border border-slate-200/60 px-4 py-3">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-slate-900 capitalize">{translatePayment(item.method)}</p>
+                  <p className="text-xs text-slate-500">{item.percentage.toFixed(1)}% do faturamento</p>
                 </div>
-                <span className="text-sm font-semibold text-gray-900">{currencyFormatter.format(item.amount)}</span>
+                <span className="text-base font-semibold text-slate-900">{currencyFormatter.format(item.amount)}</span>
               </div>
             ))}
           </div>
         </div>
-        <div className="bg-white shadow rounded p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-            <h2 className="text-lg font-semibold text-gray-800">Produtos vendidos</h2>
-            <div className="inline-flex rounded border border-gray-200 bg-gray-50 p-1 text-xs font-medium text-gray-600">
+        <div className="glass-panel p-6">
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-lg font-semibold text-slate-900">Produtos vendidos</h2>
+              <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Cardápio em destaque</p>
+            </div>
+            <div className="inline-flex rounded-full border border-slate-200 bg-white p-1 text-xs font-semibold text-slate-600 shadow-inner">
               <button
                 type="button"
                 onClick={() => setProductView('top')}
-                className={`px-3 py-1 rounded transition ${productView === 'top' ? 'bg-white text-gray-900 shadow' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`px-3 py-1 rounded-full transition ${
+                  productView === 'top' ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
                 Destaques
               </button>
               <button
                 type="button"
                 onClick={() => setProductView('all')}
-                className={`px-3 py-1 rounded transition ${productView === 'all' ? 'bg-white text-gray-900 shadow' : 'text-gray-500 hover:text-gray-700'}`}
+                className={`px-3 py-1 rounded-full transition ${
+                  productView === 'all' ? 'bg-gradient-to-r from-blue-600 to-sky-500 text-white shadow-lg' : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
                 Todos
               </button>
@@ -136,7 +152,7 @@ const topProducts = useMemo(
                 <p className="text-sm text-gray-500">Nenhum produto vendido no período informado.</p>
               )}
               {topProducts.map((product) => (
-                <div key={product.product_id} className="flex items-center justify-between">
+                <div key={product.product_id} className="flex items-center justify-between rounded-2xl border border-slate-200 px-4 py-3">
                   <div>
                     <p className="text-sm font-medium text-gray-700">{product.name}</p>
                     <p className="text-xs text-gray-400">{product.quantity_sold.toFixed(2)} unidades</p>
@@ -153,7 +169,7 @@ const topProducts = useMemo(
                 <p className="text-sm text-gray-500">Nenhum produto vendido no período informado.</p>
               ) : (
                 <table className="min-w-full text-sm">
-                  <thead className="bg-gray-100 text-xs uppercase tracking-wide text-gray-500">
+                  <thead className="bg-slate-900/5 text-[11px] uppercase tracking-wide text-slate-500">
                     <tr>
                       <th className="px-4 py-2 text-left font-medium">Produto</th>
                       <th className="px-4 py-2 text-right font-medium">Quantidade</th>
@@ -163,11 +179,9 @@ const topProducts = useMemo(
                   <tbody className="divide-y divide-gray-100">
                     {allProducts.map((product) => (
                       <tr key={product.product_id}>
-                        <td className="px-4 py-2 text-gray-700">{product.name}</td>
-                        <td className="px-4 py-2 text-right text-gray-600">
-                          {product.quantity_sold.toFixed(2)}
-                        </td>
-                        <td className="px-4 py-2 text-right text-gray-900 font-medium">
+                        <td className="px-4 py-3 text-gray-700">{product.name}</td>
+                        <td className="px-4 py-3 text-right text-gray-600">{product.quantity_sold.toFixed(2)}</td>
+                        <td className="px-4 py-3 text-right text-gray-900 font-medium">
                           {currencyFormatter.format(product.revenue)}
                         </td>
                       </tr>
@@ -180,8 +194,8 @@ const topProducts = useMemo(
         </div>
       </section>
 
-      <footer className="text-xs text-gray-400">
-        Atualizado às {new Date(data.generated_at).toLocaleTimeString('pt-BR')} — fonte: módulo de analytics.
+      <footer className="text-xs uppercase tracking-[0.25em] text-slate-400">
+        Atualizado às {new Date(data.generated_at).toLocaleTimeString('pt-BR')} · fonte: módulo de analytics
       </footer>
     </div>
   )
@@ -189,9 +203,12 @@ const topProducts = useMemo(
 
 function KpiCard({ title, value }: { title: string; value: string }) {
   return (
-    <div className="bg-white shadow rounded px-6 py-5">
-      <p className="text-sm text-gray-500">{title}</p>
-      <p className="text-2xl font-semibold text-gray-900 mt-2">{value}</p>
+    <div className="glass-panel px-6 py-6">
+      <p className="text-xs uppercase tracking-[0.3em] text-slate-500">{title}</p>
+      <p className="mt-3 text-3xl font-semibold text-slate-900">{value}</p>
+      <span className="mt-2 inline-flex w-fit rounded-full bg-slate-900/5 px-3 py-1 text-[11px] font-semibold text-slate-500">
+        Hoje
+      </span>
     </div>
   )
 }
