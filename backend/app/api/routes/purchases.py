@@ -1,7 +1,9 @@
-from datetime import datetime, timedelta
-from typing import List
+from datetime import date, datetime, timedelta
+from typing import List, Literal, Optional
+from calendar import monthrange
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from ...api.deps import get_db_dep, get_tenant_id, require_roles
@@ -13,9 +15,68 @@ from ...schemas.purchases import (
     PurchaseOrderOut,
     PayableCreate,
     PayableOut,
+    PayableSummaryWindow,
+    PayablesSummaryOut,
 )
 
 router = APIRouter()
+SummaryGranularity = Literal["daily", "weekly", "monthly"]
+
+
+def sum_paid_between(db: Session, tenant_id: str, start: date, end: date) -> float:
+    start_dt = datetime.combine(start, datetime.min.time())
+    end_dt = datetime.combine(end + timedelta(days=1), datetime.min.time())
+    total = (
+        db.query(func.coalesce(func.sum(Payable.amount), 0.0))
+        .filter(
+            Payable.tenant_id == tenant_id,
+            Payable.status == PayableStatus.PAID,
+            Payable.paid_at.isnot(None),
+            Payable.paid_at >= start_dt,
+            Payable.paid_at < end_dt,
+        )
+        .scalar()
+    )
+    return float(total or 0.0)
+
+
+def resolve_period(
+    granularity: SummaryGranularity,
+    reference_date: Optional[date],
+    start_date: Optional[date],
+    end_date: Optional[date],
+) -> tuple[date, date]:
+    if start_date and end_date:
+        if start_date > end_date:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Data inicial deve ser anterior ou igual à final",
+            )
+        return start_date, end_date
+    if (start_date and not end_date) or (end_date and not start_date):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe data inicial e final para uso personalizado",
+        )
+
+    target = reference_date or datetime.utcnow().date()
+    if granularity == "daily":
+        return target, target
+    if granularity == "weekly":
+        week_start = target - timedelta(days=target.weekday())
+        week_end = week_start + timedelta(days=6)
+        return week_start, week_end
+    if granularity == "monthly":
+        month_start = target.replace(day=1)
+        last_day = monthrange(month_start.year, month_start.month)[1]
+        month_end = month_start.replace(day=last_day)
+        return month_start, month_end
+    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Granularidade inválida")
+
+
+def build_window(db: Session, tenant_id: str, start: date, end: date) -> PayableSummaryWindow:
+    total = sum_paid_between(db, tenant_id, start, end)
+    return PayableSummaryWindow(start=start, end=end, total_paid=total)
 
 
 @router.post("/orders", response_model=PurchaseOrderOut)
@@ -188,6 +249,7 @@ def settle_payable(
     if payable.status != PayableStatus.OPEN:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Conta a pagar nao esta em aberto")
     payable.status = PayableStatus.PAID
+    payable.paid_at = datetime.utcnow()
     db.add(payable)
     db.commit()
     db.refresh(payable)
@@ -213,3 +275,33 @@ def cancel_payable(
     db.commit()
     db.refresh(payable)
     return payable
+
+
+@router.get("/payables/summary", response_model=PayablesSummaryOut)
+def get_payables_summary(
+    db: Session = Depends(get_db_dep),
+    tenant_id: str = Depends(get_tenant_id),
+    user = Depends(require_roles("owner", "manager", "accountant")),
+):
+    today = datetime.utcnow().date()
+    week_start = today - timedelta(days=today.weekday())
+    month_start = today.replace(day=1)
+    return PayablesSummaryOut(
+        daily=build_window(db, tenant_id, today, today),
+        weekly=build_window(db, tenant_id, week_start, today),
+        monthly=build_window(db, tenant_id, month_start, today),
+    )
+
+
+@router.get("/payables/summary/window", response_model=PayableSummaryWindow)
+def get_payables_summary_window(
+    granularity: SummaryGranularity,
+    reference_date: Optional[date] = None,
+    start_date: Optional[date] = None,
+    end_date: Optional[date] = None,
+    db: Session = Depends(get_db_dep),
+    tenant_id: str = Depends(get_tenant_id),
+    user = Depends(require_roles("owner", "manager", "accountant")),
+):
+    period_start, period_end = resolve_period(granularity, reference_date, start_date, end_date)
+    return build_window(db, tenant_id, period_start, period_end)

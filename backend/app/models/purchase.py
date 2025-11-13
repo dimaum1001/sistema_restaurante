@@ -61,6 +61,7 @@ class Payable(TenantBase, TenantMixin):
     amount = Column(Float, nullable=False)
     status = Column(SAEnum(PayableStatus), default=PayableStatus.OPEN, nullable=False)
     description = Column(String, nullable=True)
+    paid_at = Column(DateTime(timezone=True), nullable=True)
 
     supplier = relationship("Supplier")
     purchase_order = relationship("PurchaseOrder")

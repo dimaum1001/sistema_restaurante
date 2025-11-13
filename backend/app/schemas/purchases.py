@@ -53,3 +53,16 @@ class PayableOut(IDModel):
     status: str
     supplier: Optional[SupplierSummary]
     purchase_order_id: Optional[int]
+    paid_at: Optional[datetime]
+
+
+class PayableSummaryWindow(BaseModel):
+    start: date
+    end: date
+    total_paid: float
+
+
+class PayablesSummaryOut(BaseModel):
+    daily: PayableSummaryWindow
+    weekly: PayableSummaryWindow
+    monthly: PayableSummaryWindow

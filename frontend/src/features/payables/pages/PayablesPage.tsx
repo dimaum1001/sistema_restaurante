@@ -2,6 +2,18 @@ import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import api from '../../../hooks/useApi'
 
+const currencyFormatter = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL',
+  minimumFractionDigits: 2,
+})
+
+const periodFormatter = new Intl.DateTimeFormat('pt-BR', {
+  day: '2-digit',
+  month: 'short',
+  timeZone: 'UTC',
+})
+
 interface Payable {
   id: number
   description?: string
@@ -11,6 +23,7 @@ interface Payable {
   supplier?: {
     name: string
   }
+  paid_at?: string
 }
 
 interface PayableCreate {
@@ -19,10 +32,27 @@ interface PayableCreate {
   due_date: string
 }
 
+interface PayableSummaryWindow {
+  start: string
+  end: string
+  total_paid: number
+}
+
+type SummaryGranularity = 'daily' | 'weekly' | 'monthly'
+
 export default function PayablesPage() {
   const queryClient = useQueryClient()
   const [form, setForm] = useState<PayableCreate>({ description: '', amount: '', due_date: '' })
   const [error, setError] = useState<string | null>(null)
+  const [dailyDate, setDailyDate] = useState(() => new Date().toISOString().slice(0, 10))
+  const [weeklyValue, setWeeklyValue] = useState(() => formatWeekInput(new Date()))
+  const [monthlyValue, setMonthlyValue] = useState(() => formatMonthInput(new Date()))
+  const todayIso = useMemo(() => new Date().toISOString().slice(0, 10), [])
+  const currentWeekValue = useMemo(() => formatWeekInput(new Date()), [])
+  const currentMonthValue = useMemo(() => formatMonthInput(new Date()), [])
+
+  const weeklyReferenceDate = useMemo(() => isoWeekValueToDate(weeklyValue), [weeklyValue])
+  const monthlyReferenceDate = useMemo(() => monthValueToDate(monthlyValue), [monthlyValue])
 
   const payablesQuery = useQuery<Payable[]>({
     queryKey: ['payables'],
@@ -30,6 +60,24 @@ export default function PayablesPage() {
       const response = await api.get('/purchases/payables')
       return response.data
     },
+  })
+
+  const dailySummaryQuery = useQuery<PayableSummaryWindow>({
+    queryKey: ['payables', 'summary', 'daily', dailyDate],
+    queryFn: () => fetchSummaryWindow('daily', dailyDate),
+    enabled: Boolean(dailyDate),
+  })
+
+  const weeklySummaryQuery = useQuery<PayableSummaryWindow>({
+    queryKey: ['payables', 'summary', 'weekly', weeklyReferenceDate],
+    queryFn: () => fetchSummaryWindow('weekly', weeklyReferenceDate!),
+    enabled: Boolean(weeklyReferenceDate),
+  })
+
+  const monthlySummaryQuery = useQuery<PayableSummaryWindow>({
+    queryKey: ['payables', 'summary', 'monthly', monthlyReferenceDate],
+    queryFn: () => fetchSummaryWindow('monthly', monthlyReferenceDate!),
+    enabled: Boolean(monthlyReferenceDate),
   })
 
   const createMutation = useMutation({
@@ -103,6 +151,66 @@ export default function PayablesPage() {
         </p>
       </header>
 
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <SummaryCard
+          label="Pago no dia"
+          description="Pagamentos confirmados no dia selecionado."
+          summary={dailySummaryQuery.data}
+          loading={dailySummaryQuery.isLoading}
+          error={dailySummaryQuery.isError ? 'Erro ao carregar resumo diário.' : undefined}
+          control={
+            <label className="flex flex-col text-xs text-gray-500">
+              <span className="mb-1 font-semibold text-gray-600">Dia</span>
+              <input
+                className="input-soft text-sm"
+                type="date"
+                value={dailyDate}
+                max={todayIso}
+                onChange={(event) => setDailyDate(event.target.value)}
+              />
+            </label>
+          }
+        />
+        <SummaryCard
+          label="Resumo semanal"
+          description="Total quitado para a semana escolhida."
+          summary={weeklySummaryQuery.data}
+          loading={weeklySummaryQuery.isLoading}
+          error={weeklySummaryQuery.isError ? 'Erro ao carregar resumo semanal.' : undefined}
+          control={
+            <label className="flex flex-col text-xs text-gray-500">
+              <span className="mb-1 font-semibold text-gray-600">Semana (ISO)</span>
+              <input
+                className="input-soft text-sm"
+                type="week"
+                value={weeklyValue}
+                max={currentWeekValue}
+                onChange={(event) => setWeeklyValue(event.target.value)}
+              />
+            </label>
+          }
+        />
+        <SummaryCard
+          label="Resumo mensal"
+          description="Despesas quitadas no mês selecionado."
+          summary={monthlySummaryQuery.data}
+          loading={monthlySummaryQuery.isLoading}
+          error={monthlySummaryQuery.isError ? 'Erro ao carregar resumo mensal.' : undefined}
+          control={
+            <label className="flex flex-col text-xs text-gray-500">
+              <span className="mb-1 font-semibold text-gray-600">Mês</span>
+              <input
+                className="input-soft text-sm"
+                type="month"
+                value={monthlyValue}
+                max={currentMonthValue}
+                onChange={(event) => setMonthlyValue(event.target.value)}
+              />
+            </label>
+          }
+        />
+      </section>
+
       <form onSubmit={handleSubmit} className="glass-panel space-y-4 p-6">
         <h2 className="text-lg font-semibold text-gray-800">Nova despesa</h2>
         {error && <div className="text-sm text-red-500">{error}</div>}
@@ -164,6 +272,44 @@ export default function PayablesPage() {
           disabled
         />
       </section>
+    </div>
+  )
+}
+
+function SummaryCard({
+  label,
+  description,
+  summary,
+  loading,
+  control,
+  error,
+}: {
+  label: string
+  description: string
+  summary?: PayableSummaryWindow
+  loading: boolean
+  control?: React.ReactNode
+  error?: string
+}) {
+  const hasSummary = Boolean(summary)
+  return (
+    <div className="glass-panel space-y-3 rounded-2xl p-5">
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">{label}</span>
+          <div>
+            <p className="text-3xl font-semibold text-gray-900">
+              {loading && !hasSummary ? '...' : currencyFormatter.format(summary?.total_paid ?? 0)}
+            </p>
+            <p className="text-xs text-gray-500">
+              {summary ? `Período ${formatPeriod(summary)}` : loading ? 'Carregando dados...' : 'Sem registros pagos'}
+            </p>
+          </div>
+        </div>
+        {control && <div className="text-right">{control}</div>}
+      </div>
+      <p className="text-sm text-gray-600">{description}</p>
+      {error && <p className="text-sm text-red-600">{error}</p>}
     </div>
   )
 }
@@ -255,4 +401,63 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
       {children}
     </label>
   )
+}
+
+function formatPeriod(summary: PayableSummaryWindow) {
+  const start = new Date(`${summary.start}T00:00:00Z`)
+  const end = new Date(`${summary.end}T00:00:00Z`)
+  const formattedStart = periodFormatter.format(start)
+  const formattedEnd = periodFormatter.format(end)
+  if (summary.start === summary.end) {
+    return formattedStart
+  }
+  return `${formattedStart} - ${formattedEnd}`
+}
+
+async function fetchSummaryWindow(granularity: SummaryGranularity, referenceDate: string) {
+  const response = await api.get('/purchases/payables/summary/window', {
+    params: {
+      granularity,
+      reference_date: referenceDate,
+    },
+  })
+  return response.data
+}
+
+function formatWeekInput(date: Date) {
+  const target = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()))
+  const dayNumber = target.getUTCDay() || 7
+  target.setUTCDate(target.getUTCDate() + 4 - dayNumber)
+  const year = target.getUTCFullYear()
+  const yearStart = new Date(Date.UTC(year, 0, 1))
+  const week = Math.ceil(((target.getTime() - yearStart.getTime()) / 86400000 + 1) / 7)
+  return `${year}-W${String(week).padStart(2, '0')}`
+}
+
+function isoWeekValueToDate(value: string) {
+  const match = /^(\d{4})-W(\d{2})$/.exec(value)
+  if (!match) {
+    return null
+  }
+  const year = Number(match[1])
+  const week = Number(match[2])
+  if (!year || !week) {
+    return null
+  }
+  const simple = new Date(Date.UTC(year, 0, 1 + (week - 1) * 7))
+  const dayOfWeek = simple.getUTCDay()
+  const isoWeekStart = new Date(simple)
+  isoWeekStart.setUTCDate(simple.getUTCDate() - ((dayOfWeek + 6) % 7))
+  return isoWeekStart.toISOString().slice(0, 10)
+}
+
+function formatMonthInput(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+}
+
+function monthValueToDate(value: string) {
+  if (!/^\d{4}-\d{2}$/.test(value)) {
+    return null
+  }
+  return `${value}-01`
 }
