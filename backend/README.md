@@ -80,7 +80,7 @@ As rotas continuam exigindo `Authorization: Bearer <token>` e `X-Tenant`.
 ```bash
 cd backend
 python -m venv .venv
-source .venv/bin/activate  # (ou .venv\Scripts\activate no Windows)
+source .venv/bin/activate  # (ou .venv\Scripts\activate no Windows)\  s
 pip install -r requirements.txt
 cp .env.example .env
 alembic upgrade head

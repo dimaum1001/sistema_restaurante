@@ -1,6 +1,7 @@
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ...api.deps import get_db_dep, get_tenant_id, require_roles, get_current_user
@@ -141,7 +142,14 @@ def delete_product(
     if not product:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Produto não encontrado")
     db.delete(product)
-    db.commit()
+    try:
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Produto não pode ser excluido pois existem registros dependentes (pedidos, estoque ou compras).",
+        )
     return {"detail": "Produto removido"}
 
 

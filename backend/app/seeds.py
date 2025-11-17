@@ -6,7 +6,7 @@ entidades básicas para experimentação.
 """
 import random
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time
 from pathlib import Path
 
 from faker import Faker
@@ -89,16 +89,23 @@ def seed():
         db.add(unit)
         db.flush()
         units[abbr] = unit
+    portion_unit = units.get("porção") or units.get("por��o") or units.get("un")
+    unit_piece = units["un"]
     # Products (ingredients)
     ingredients_data = [
         ("Arroz", "g", 5.0),
-        ("Feijão", "g", 7.0),
+        ("Feijao", "g", 7.0),
         ("Carne", "g", 30.0),
         ("Frango", "g", 20.0),
         ("Alface", "g", 3.0),
         ("Tomate", "g", 4.0),
     ]
+    for i in range(1, 31):
+        ingredients_data.append((f"Ingrediente Base {i}", "g", round(random.uniform(2.0, 18.0), 2)))
+    for i in range(1, 16):
+        ingredients_data.append((f"Tempero Especial {i}", "g", round(random.uniform(1.0, 12.0), 2)))
     products = {}
+    ingredient_names = []
     for name, unit_abbr, cost in ingredients_data:
         p = Product(
             name=name,
@@ -111,6 +118,7 @@ def seed():
         db.add(p)
         db.flush()
         products[name] = p
+        ingredient_names.append(name)
         rule = InventoryRule(
             product_id=p.id,
             reorder_point=2000.0,
@@ -121,14 +129,15 @@ def seed():
         db.add(rule)
     # Dishes
     dishes_data = [
-        ("Prato Executivo", 40.0, [("Arroz", 200), ("Feijão", 150), ("Carne", 200), ("Alface", 30), ("Tomate", 30)]),
+        ("Prato Executivo", 40.0, [("Arroz", 200), ("Feijao", 150), ("Carne", 200), ("Alface", 30), ("Tomate", 30)]),
         ("Salada", 20.0, [("Alface", 100), ("Tomate", 50)]),
     ]
+    dish_products = []
     for dish_name, sale_price, recipe_items in dishes_data:
         dish = Product(
             name=dish_name,
             type=ProductType.DISH,
-            unit_id=units["porção"].id,
+            unit_id=portion_unit.id if portion_unit else None,
             cost_price=None,
             sale_price=sale_price,
             tenant_id=tenant_id,
@@ -136,6 +145,7 @@ def seed():
         db.add(dish)
         db.flush()
         products[dish_name] = dish
+        dish_products.append(dish)
         rule = InventoryRule(
             product_id=dish.id,
             reorder_point=20.0,
@@ -144,12 +154,93 @@ def seed():
             tenant_id=tenant_id,
         )
         db.add(rule)
-        recipe = Recipe(product_id=dish.id, yield_qty=1, yield_unit_id=units["porção"].id, tenant_id=tenant_id)
+        recipe = Recipe(
+            product_id=dish.id,
+            yield_qty=1,
+            yield_unit_id=portion_unit.id if portion_unit else None,
+            tenant_id=tenant_id,
+        )
         db.add(recipe)
         db.flush()
         for ing_name, qty in recipe_items:
             ing = products[ing_name]
-            ri = RecipeItem(recipe_id=recipe.id, ingredient_id=ing.id, quantity=qty, unit_id=units["g"].id, tenant_id=tenant_id)
+            ri = RecipeItem(
+                recipe_id=recipe.id,
+                ingredient_id=ing.id,
+                quantity=qty,
+                unit_id=units["g"].id,
+                tenant_id=tenant_id,
+            )
+            db.add(ri)
+    beverages_data = [
+        ("Suco de Laranja", 8.0),
+        ("Refrigerante Lata", 7.0),
+        ("Cerveja Artesanal", 18.0),
+        ("Água com gás", 6.0),
+    ]
+    for i in range(1, 21):
+        beverages_data.append((f"Drink Especial {i}", round(random.uniform(10.0, 42.0), 2)))
+    beverage_products = []
+    for bev_name, price in beverages_data:
+        beverage = Product(
+            name=bev_name,
+            type=ProductType.MERCHANDISE,
+            unit_id=unit_piece.id if unit_piece else None,
+            cost_price=round(price * 0.4, 2),
+            sale_price=price,
+            tenant_id=tenant_id,
+        )
+        db.add(beverage)
+        db.flush()
+        products[bev_name] = beverage
+        beverage_products.append(beverage)
+
+    dish_adjectives = ["Premium", "Tradicional", "Defumado", "Grelhado", "Assado", "Cremoso", "Especial"]
+    dish_bases = ["Frango", "Carne", "Porco", "Tilapia", "Risoto", "Penne", "Lasanha", "Burguer", "Strogonoff"]
+    dish_styles = ["da Casa", "Mediterraneo", "Nordestino", "Veggie", "da Serra", "da Praia", "Light"]
+    target_dish_count = 100
+    rng = random.Random(42)
+    while len(dish_products) < target_dish_count:
+        name = f"{rng.choice(dish_adjectives)} {rng.choice(dish_bases)} {rng.choice(dish_styles)}"
+        if name in products:
+            name = f"{name} #{len(dish_products)+1}"
+        sale_price = round(rng.uniform(25.0, 160.0), 2)
+        dish = Product(
+            name=name,
+            type=ProductType.DISH,
+            unit_id=portion_unit.id if portion_unit else None,
+            cost_price=None,
+            sale_price=sale_price,
+            tenant_id=tenant_id,
+        )
+        db.add(dish)
+        db.flush()
+        products[name] = dish
+        dish_products.append(dish)
+        rule = InventoryRule(
+            product_id=dish.id,
+            reorder_point=30.0,
+            par_level=90.0,
+            lead_time_days=2,
+            tenant_id=tenant_id,
+        )
+        db.add(rule)
+        recipe = Recipe(product_id=dish.id, yield_qty=1, yield_unit_id=portion_unit.id if portion_unit else None, tenant_id=tenant_id)
+        db.add(recipe)
+        db.flush()
+        sample_size = min(len(ingredient_names), 5)
+        recipe_ings = rng.sample(ingredient_names, k=sample_size)
+        use_until = rng.randint(3, sample_size)
+        for ing_name in recipe_ings[:use_until]:
+            ing = products[ing_name]
+            qty = rng.randint(60, 320)
+            ri = RecipeItem(
+                recipe_id=recipe.id,
+                ingredient_id=ing.id,
+                quantity=qty,
+                unit_id=units["g"].id,
+                tenant_id=tenant_id,
+            )
             db.add(ri)
     # Batches (estoque inicial)
     for p in products.values():
@@ -192,7 +283,7 @@ def seed():
     db.add(po)
     db.flush()
     total_amount = 0.0
-    for p_name in ["Arroz", "Feijão"]:
+    for p_name in ["Arroz", "Feijao"]:
         p = products[p_name]
         qty = 5000
         unit_price = p.cost_price
@@ -228,14 +319,14 @@ def seed():
     db.add(payable)
     # Tables
     tables = []
-    for i in range(1, 11):
+    for i in range(1, 31):
         table = Table(name=f"Mesa {i}", status="free", capacity=4, tenant_id=tenant_id)
         db.add(table)
         db.flush()
         tables.append(table)
     # Customers
     customers = []
-    for i in range(10):
+    for i in range(200):
         c = Customer(
             name=fake.name(),
             phone=fake.phone_number(),
@@ -251,45 +342,71 @@ def seed():
         for purpose in ["marketing", "fidelidade"]:
             cons = Consent(customer_id=c.id, purpose=purpose, tenant_id=tenant_id)
             db.add(cons)
-    # Sample orders (últimos 30 dias)
-    for _ in range(100):
-        customer = random.choice(customers)
-        table = random.choice(tables)
-        order = Order(
-            table_id=table.id,
-            customer_id=customer.id,
-            status=OrderStatus.PAID,
-            opened_at=datetime.utcnow() - timedelta(days=random.randint(1, 30)),
-            closed_at=datetime.utcnow() - timedelta(days=random.randint(1, 30)),
-            tenant_id=tenant_id,
-        )
-        db.add(order)
-        db.flush()
-        total = 0.0
-        # adiciona 1-3 items
-        for _ in range(random.randint(1, 3)):
-            product = random.choice([products["Prato Executivo"], products["Salada"]])
-            qty = random.randint(1, 3)
-            oi = OrderItem(
-                order_id=order.id,
-                product_id=product.id,
-                quantity=qty,
-                unit_price=product.sale_price,
-                notes=None,
+    # Sample orders (últimos 90 dias com grande volume)
+    dish_pool = dish_products[:]
+    beverage_pool = beverage_products[:]
+    payment_methods = list(PaymentMethod)
+    days_to_generate = 90
+    now = datetime.utcnow()
+    for day_offset in range(days_to_generate):
+        day = now.date() - timedelta(days=day_offset)
+        orders_today = random.randint(150, 260)
+        for _ in range(orders_today):
+            customer = random.choice(customers)
+            table = random.choice(tables)
+            hour = random.randint(10, 23)
+            minute = random.randint(0, 59)
+            opened_at = datetime.combine(day, time(hour=hour, minute=minute))
+            closed_at = opened_at + timedelta(minutes=random.randint(20, 120))
+            order = Order(
+                table_id=table.id,
+                customer_id=customer.id,
+                status=OrderStatus.PAID,
+                opened_at=opened_at,
+                closed_at=closed_at,
                 tenant_id=tenant_id,
             )
-            db.add(oi)
-            total += qty * (product.sale_price or 0)
-        order.total = total
-        # pagamentos
-        pay = Payment(
-            order_id=order.id,
-            method=random.choice(list(PaymentMethod)),
-            amount=total,
-            status=PaymentStatus.COMPLETED,
-            tenant_id=tenant_id,
-        )
-        db.add(pay)
+            db.add(order)
+            db.flush()
+            total = 0.0
+            dish_count = random.randint(1, 4)
+            for _ in range(dish_count):
+                product = random.choice(dish_pool)
+                qty = random.randint(1, 4)
+                unit_price = product.sale_price or 0
+                oi = OrderItem(
+                    order_id=order.id,
+                    product_id=product.id,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    notes=None,
+                    tenant_id=tenant_id,
+                )
+                db.add(oi)
+                total += qty * unit_price
+            if beverage_pool and random.random() < 0.7:
+                beverage = random.choice(beverage_pool)
+                qty = random.randint(1, 5)
+                unit_price = beverage.sale_price or 0
+                oi = OrderItem(
+                    order_id=order.id,
+                    product_id=beverage.id,
+                    quantity=qty,
+                    unit_price=unit_price,
+                    notes=None,
+                    tenant_id=tenant_id,
+                )
+                db.add(oi)
+                total += qty * unit_price
+            order.total = round(total, 2)
+            pay = Payment(
+                order_id=order.id,
+                method=random.choice(payment_methods),
+                amount=order.total,
+                status=PaymentStatus.COMPLETED,
+                tenant_id=tenant_id,
+            )
+            db.add(pay)
     db.commit()
     db.close()
     print("Seeds executadas com sucesso.")

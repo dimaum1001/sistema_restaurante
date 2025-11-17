@@ -1,13 +1,21 @@
-import { useCallback, useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { FormEvent, useCallback, useMemo, useState } from 'react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import jsPDF from 'jspdf'
 import api from '../../../hooks/useApi'
+
+interface Unit {
+  id: number
+  name: string
+  abbreviation: string
+}
 
 interface Product {
   id: number
   name: string
   sale_price?: number
+  cost_price?: number
   type: string
+  unit?: Unit
 }
 
 interface OrderResponse {
@@ -64,15 +72,39 @@ interface ReceiptData {
   issuedAt: string
 }
 
+interface ProductEditFormState {
+  name: string
+  unit_id: string
+  sale_price: string
+  cost_price: string
+}
+
+interface ProductUpdatePayload {
+  name: string
+  type: string
+  unit_id?: number
+  sale_price?: number
+  cost_price?: number
+}
+
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })
 
 const productTypeLabels: Record<string, string> = {
   dish: 'Prato',
   merchandise: 'Bebida',
+  ingredient: 'Insumo',
+}
+
+const emptyProductEditForm: ProductEditFormState = {
+  name: '',
+  unit_id: '',
+  sale_price: '',
+  cost_price: '',
 }
 
 export default function OrdersPage() {
+  const queryClient = useQueryClient()
   const { data: products, isLoading } = useQuery<Product[]>({
     queryKey: ['products', 'catalog'],
     queryFn: async () => {
@@ -92,19 +124,23 @@ export default function OrdersPage() {
   })
 
   const dishes = useMemo(
-    () =>
-      (products ?? []).filter(
-        (product) => product.type === 'dish' && (product.sale_price ?? 0) > 0,
-      ),
+    () => (products ?? []).filter((product) => product.type === 'dish'),
     [products],
   )
 
   const beverages = useMemo(
-    () =>
-      (products ?? []).filter(
-        (product) => product.type === 'merchandise' && (product.sale_price ?? 0) > 0,
-      ),
+    () => (products ?? []).filter((product) => product.type === 'merchandise'),
     [products],
+  )
+
+  const unsellableDishCount = useMemo(
+    () => dishes.filter((dish) => (dish.sale_price ?? 0) <= 0).length,
+    [dishes],
+  )
+
+  const unsellableBeverageCount = useMemo(
+    () => beverages.filter((beverage) => (beverage.sale_price ?? 0) <= 0).length,
+    [beverages],
   )
 
   const topSuggestionGroups = useMemo(() => {
@@ -172,6 +208,9 @@ export default function OrdersPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [quickView, setQuickView] = useState<'dishes' | 'beverages' | null>(null)
   const [receiptData, setReceiptData] = useState<ReceiptData | null>(null)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+  const [productEditForm, setProductEditForm] = useState<ProductEditFormState>({ ...emptyProductEditForm })
+  const [productEditError, setProductEditError] = useState<string | null>(null)
 
   const paymentLabels = useMemo(
     () =>
@@ -183,6 +222,88 @@ export default function OrdersPage() {
   )
 
   const normalizedSearch = searchTerm.trim().toLowerCase()
+
+  const unitsQuery = useQuery<Unit[]>({
+    queryKey: ['products', 'units'],
+    queryFn: async () => {
+      const response = await api.get('/products/units')
+      return response.data
+    },
+    enabled: Boolean(editingProduct),
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const closeProductEditor = () => {
+    setEditingProduct(null)
+    setProductEditForm({ ...emptyProductEditForm })
+    setProductEditError(null)
+  }
+
+  const startEditProduct = (product: Product) => {
+    setEditingProduct(product)
+    setProductEditForm({
+      name: product.name,
+      unit_id: product.unit ? String(product.unit.id) : '',
+      sale_price: product.sale_price !== undefined ? product.sale_price.toString() : '',
+      cost_price: product.cost_price !== undefined ? product.cost_price.toString() : '',
+    })
+    setProductEditError(null)
+  }
+
+  const updateProductMutation = useMutation({
+    mutationFn: async ({ id, payload }: { id: number; payload: ProductUpdatePayload }) => {
+      const response = await api.put(`/products/${id}`, payload)
+      return response.data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products', 'catalog'] })
+      queryClient.invalidateQueries({ queryKey: ['products', 'dishes'] })
+      queryClient.invalidateQueries({ queryKey: ['products', 'ingredients'] })
+      queryClient.invalidateQueries({ queryKey: ['products', 'beverages'] })
+      queryClient.invalidateQueries({ queryKey: ['analytics', 'top-products'] })
+      closeProductEditor()
+    },
+    onError: (err: any) => {
+      setProductEditError(err.response?.data?.detail || 'Nao foi possivel atualizar o item.')
+    },
+  })
+
+  const handleProductEditSubmit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!editingProduct) {
+      return
+    }
+    setProductEditError(null)
+
+    const trimmedName = productEditForm.name.trim()
+    const unitId = productEditForm.unit_id ? Number(productEditForm.unit_id) : undefined
+    const salePrice = productEditForm.sale_price ? Number(productEditForm.sale_price) : undefined
+    const costPrice = productEditForm.cost_price ? Number(productEditForm.cost_price) : undefined
+    const requiresSalePrice = editingProduct.type !== 'ingredient'
+    const requiresUnit = editingProduct.type === 'ingredient'
+
+    if (!trimmedName) {
+      setProductEditError('Informe o nome do item.')
+      return
+    }
+    if (requiresSalePrice && (!salePrice || salePrice <= 0)) {
+      setProductEditError('Informe um preco de venda maior que zero.')
+      return
+    }
+    if (requiresUnit && !unitId) {
+      setProductEditError('Selecione a unidade de medida do insumo.')
+      return
+    }
+
+    const payload: ProductUpdatePayload = {
+      name: trimmedName,
+      type: editingProduct.type,
+      unit_id: unitId,
+      sale_price: salePrice,
+      cost_price: costPrice,
+    }
+    updateProductMutation.mutate({ id: editingProduct.id, payload })
+  }
 
   const matchedProducts = useMemo(() => {
     if (!normalizedSearch) {
@@ -393,14 +514,15 @@ export default function OrdersPage() {
   const canPay = !!order && !payOrderMutation.isPending
 
   return (
-    <div className="space-y-8">
-      <header className="glass-panel space-y-2 p-6">
-        <span className="section-pill">Frente de caixa</span>
-        <h1 className="text-3xl font-semibold text-gray-900">PDV a la carte</h1>
-        <p className="text-sm text-gray-500">
-          Adicione pratos e bebidas em poucos toques. Os acompanhamentos padrao são baixados automaticamente do estoque.
-        </p>
-      </header>
+    <>
+      <div className="space-y-8">
+        <header className="glass-panel space-y-2 p-6">
+          <span className="section-pill">Frente de caixa</span>
+          <h1 className="text-3xl font-semibold text-gray-900">PDV a la carte</h1>
+          <p className="text-sm text-gray-500">
+            Adicione pratos e bebidas em poucos toques. Os acompanhamentos padrao sao baixados automaticamente do estoque.
+          </p>
+        </header>
 
       {error && <div className="text-red-500 text-sm">{error}</div>}
 
@@ -463,6 +585,7 @@ export default function OrdersPage() {
                     results={matchedProducts}
                     onAdd={addItem}
                     onClose={() => setSearchTerm('')}
+                    onEdit={startEditProduct}
                   />
                 ) : (
                   <>
@@ -472,6 +595,7 @@ export default function OrdersPage() {
                         emptyMessage="Ainda nao ha dados suficientes para destacar pratos."
                         items={topDishSuggestions}
                         onAdd={addItem}
+                        onEdit={startEditProduct}
                       />
                     )}
                     {quickView === 'beverages' && (
@@ -480,20 +604,37 @@ export default function OrdersPage() {
                         emptyMessage="Ainda nao ha dados suficientes para destacar bebidas."
                         items={topBeverageSuggestions}
                         onAdd={addItem}
+                        onEdit={startEditProduct}
                       />
+                    )}
+                    {unsellableDishCount > 0 && (
+                      <div className="rounded border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                        {unsellableDishCount === 1
+                          ? '1 prato ainda nao possui preco de venda. Clique em Editar para liberar no PDV.'
+                          : `${unsellableDishCount} pratos ainda nao possuem preco de venda. Clique em Editar para libera-los no PDV.`}
+                      </div>
                     )}
                     <CategoryList
                       title="Pratos"
                       products={dishes}
                       emptyMessage='Nenhum prato cadastrado. Cadastre itens em "Produtos".'
                       onAdd={addItem}
+                      onEdit={startEditProduct}
                       highlights={dishHighlights}
                     />
+                    {unsellableBeverageCount > 0 && (
+                      <div className="rounded border border-sky-200 bg-sky-50 px-4 py-3 text-xs font-semibold text-sky-800">
+                        {unsellableBeverageCount === 1
+                          ? '1 bebida ainda nao possui preco. Ajuste em Editar para vender no PDV.'
+                          : `${unsellableBeverageCount} bebidas ainda nao possuem preco. Ajuste em Editar para vende-las no PDV.`}
+                      </div>
+                    )}
                     <CategoryList
                       title="Bebidas"
                       products={beverages}
                       emptyMessage='Nenhuma bebida cadastrada. Cadastre itens em "Produtos".'
                       onAdd={addItem}
+                      onEdit={startEditProduct}
                       highlights={beverageHighlights}
                     />
                   </>
@@ -632,7 +773,19 @@ export default function OrdersPage() {
           </div>
         </section>
       </div>
-    </div>
+      </div>
+      <ProductEditDrawer
+        product={editingProduct}
+        form={productEditForm}
+        units={unitsQuery.data ?? []}
+        error={productEditError}
+        isSaving={updateProductMutation.isPending}
+        isLoadingUnits={unitsQuery.isLoading}
+        onClose={closeProductEditor}
+        onChange={(field, value) => setProductEditForm((prev) => ({ ...prev, [field]: value }))}
+        onSubmit={handleProductEditSubmit}
+      />
+    </>
   )
 }
 
@@ -641,12 +794,14 @@ function CategoryList({
   products,
   emptyMessage,
   onAdd,
+  onEdit,
   highlights,
 }: {
   title: string
   products: Product[]
   emptyMessage: string
   onAdd: (product: Product) => void
+  onEdit?: (product: Product) => void
   highlights?: Map<number, string>
 }) {
   return (
@@ -658,31 +813,61 @@ function CategoryList({
         <div className="px-4 py-3 text-sm text-gray-500">{emptyMessage}</div>
       ) : (
         <ul>
-          {products.map((product) => {
-            const highlightLabel = highlights?.get(product.id)
-            const price = product.sale_price ?? 0
-            return (
-              <li
-                key={product.id}
-                className={`px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between transition ${
-                  highlightLabel ? 'bg-amber-50/80 ring-1 ring-amber-200' : 'hover:bg-gray-50'
-                }`}
-              >
-                <div>
+          {[...products]
+            .sort((a, b) => {
+              const aSellable = (a.sale_price ?? 0) > 0 ? 1 : 0
+              const bSellable = (b.sale_price ?? 0) > 0 ? 1 : 0
+              if (aSellable !== bSellable) {
+                return bSellable - aSellable
+              }
+              return a.name.localeCompare(b.name)
+            })
+            .map((product) => {
+              const highlightLabel = highlights?.get(product.id)
+              const salePrice = typeof product.sale_price === 'number' ? product.sale_price : null
+              const isSellable = !!salePrice && salePrice > 0
+              const priceLabel = salePrice !== null ? formatCurrency(salePrice) : 'Sem preco de venda'
+              return (
+                <li
+                  key={product.id}
+                  className={`px-4 py-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between transition ${
+                    highlightLabel ? 'bg-amber-50/80 ring-1 ring-amber-200' : 'hover:bg-gray-50'
+                  }`}
+                >
+                  <div>
                   <p className="font-medium text-gray-800">{product.name}</p>
-                  <p className="text-xs text-gray-400">{formatCurrency(price)}</p>
+                  <p className={`text-xs ${isSellable ? 'text-gray-400' : 'text-amber-600 font-semibold'}`}>
+                    {priceLabel}
+                    {!isSellable && ' - Defina um preco para liberar no PDV.'}
+                  </p>
                   {highlightLabel && (
                     <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase text-amber-700">
                       {highlightLabel}
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={() => onAdd(product)}
-                  className="text-sm font-semibold text-blue-600 transition hover:text-blue-700"
-                >
-                  Adicionar
-                </button>
+                <div className="flex items-center gap-3">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(product)}
+                      className="text-sm font-semibold text-gray-500 transition hover:text-gray-700"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onAdd(product)}
+                    disabled={!isSellable}
+                    className={`text-sm font-semibold transition ${
+                      isSellable
+                        ? 'text-blue-600 hover:text-blue-700'
+                        : 'text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSellable ? 'Adicionar' : 'Indisponivel'}
+                  </button>
+                </div>
               </li>
             )
           })}
@@ -697,11 +882,13 @@ function QuickSuggestionList({
   items,
   emptyMessage,
   onAdd,
+  onEdit,
 }: {
   title: string
   items: SuggestionItem[]
   emptyMessage: string
   onAdd: (product: Product) => void
+  onEdit?: (product: Product) => void
 }) {
   return (
     <div className="rounded border border-dashed border-amber-300 bg-amber-50 shadow-sm">
@@ -723,12 +910,23 @@ function QuickSuggestionList({
                   #{index + 1} - {item.quantitySold.toLocaleString('pt-BR')} vendidos
                 </p>
               </div>
-              <button
-                onClick={() => onAdd(item)}
-                className="text-sm font-semibold text-amber-700 transition hover:text-amber-800"
-              >
-                Adicionar
-              </button>
+              <div className="flex items-center gap-3">
+                {onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(item)}
+                    className="text-sm font-semibold text-amber-700/70 transition hover:text-amber-900"
+                  >
+                    Editar
+                  </button>
+                )}
+                <button
+                  onClick={() => onAdd(item)}
+                  className="text-sm font-semibold text-amber-700 transition hover:text-amber-800"
+                >
+                  Adicionar
+                </button>
+              </div>
             </li>
           ))}
         </ul>
@@ -741,10 +939,12 @@ function SearchResults({
   results,
   onAdd,
   onClose,
+  onEdit,
 }: {
   results: Product[]
   onAdd: (product: Product) => void
   onClose: () => void
+  onEdit?: (product: Product) => void
 }) {
   const totalResults = results.length
   return (
@@ -766,7 +966,9 @@ function SearchResults({
       ) : (
         <ul className="divide-y divide-gray-100">
           {results.map((product) => {
-            const price = product.sale_price ?? 0
+            const salePrice = typeof product.sale_price === 'number' ? product.sale_price : null
+            const isSellable = !!salePrice && salePrice > 0
+            const priceLabel = salePrice !== null ? formatCurrency(salePrice) : 'Sem preco definido'
             const typeLabel = productTypeLabels[product.type] ?? product.type
             return (
               <li
@@ -775,21 +977,164 @@ function SearchResults({
               >
                 <div>
                   <p className="font-medium text-gray-800">{product.name}</p>
-                  <p className="text-xs text-gray-400">
-                    {typeLabel} • {formatCurrency(price)}
+                  <p className={`text-xs ${isSellable ? 'text-gray-400' : 'text-amber-600 font-semibold'}`}>
+                    {typeLabel} - {priceLabel}
+                    {!isSellable && ' - Ajuste o preco para permitir vendas.'}
                   </p>
                 </div>
-                <button
-                  onClick={() => onAdd(product)}
-                  className="text-sm font-semibold text-blue-600 transition hover:text-blue-700"
-                >
-                  Adicionar
-                </button>
+                <div className="flex items-center gap-3">
+                  {onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(product)}
+                      className="text-sm font-semibold text-gray-500 transition hover:text-gray-700"
+                    >
+                      Editar
+                    </button>
+                  )}
+                  <button
+                    onClick={() => onAdd(product)}
+                    disabled={!isSellable}
+                    className={`text-sm font-semibold transition ${
+                      isSellable
+                        ? 'text-blue-600 hover:text-blue-700'
+                        : 'text-gray-400 cursor-not-allowed'
+                    }`}
+                  >
+                    {isSellable ? 'Adicionar' : 'Indisponivel'}
+                  </button>
+                </div>
               </li>
             )
           })}
         </ul>
       )}
+    </div>
+  )
+}
+function ProductEditDrawer({
+  product,
+  form,
+  units,
+  error,
+  isSaving,
+  isLoadingUnits,
+  onClose,
+  onChange,
+  onSubmit,
+}: {
+  product: Product | null
+  form: ProductEditFormState
+  units: Unit[]
+  error: string | null
+  isSaving: boolean
+  isLoadingUnits: boolean
+  onClose: () => void
+  onChange: (field: keyof ProductEditFormState, value: string) => void
+  onSubmit: (event: FormEvent<HTMLFormElement>) => void
+}) {
+  if (!product) {
+    return null
+  }
+  const typeLabel = productTypeLabels[product.type] ?? product.type
+  const requiresSalePrice = product.type !== 'ingredient'
+  const requiresUnit = product.type === 'ingredient'
+
+  return (
+    <div className="fixed inset-0 z-40 flex">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative ml-auto flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+        <div className="flex items-start justify-between border-b border-gray-200 px-6 py-4">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-gray-400">{typeLabel}</p>
+            <h3 className="text-lg font-semibold text-gray-900">{product.name}</h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-gray-200 p-2 text-gray-500 hover:text-gray-700"
+            aria-label="Fechar editor de produto"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 24 24" fill="none">
+              <path d="M6 6l12 12M6 18L18 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        <form onSubmit={onSubmit} className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+          {error && <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">{error}</div>}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Nome do item</label>
+            <input
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={form.name}
+              onChange={(event) => onChange('name', event.target.value)}
+              required
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">
+              Unidade de medida {requiresUnit ? '(obrigatoria)' : '(opcional)'}
+            </label>
+            <select
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={form.unit_id}
+              onChange={(event) => onChange('unit_id', event.target.value)}
+            >
+              <option value="">{requiresUnit ? 'Selecione a unidade' : 'Nao definir'}</option>
+              {units.map((unit) => (
+                <option key={unit.id} value={unit.id}>
+                  {unit.name} ({unit.abbreviation})
+                </option>
+              ))}
+            </select>
+            {isLoadingUnits && <p className="text-xs text-gray-400">Carregando unidades...</p>}
+            {!isLoadingUnits && units.length === 0 && (
+              <p className="text-xs text-amber-600">Cadastre unidades em Produtos &gt; Unidades.</p>
+            )}
+          </div>
+          {requiresSalePrice && (
+            <div className="space-y-1">
+              <label className="text-sm font-medium text-gray-700">Preco de venda</label>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+                value={form.sale_price}
+                onChange={(event) => onChange('sale_price', event.target.value)}
+                required={requiresSalePrice}
+              />
+            </div>
+          )}
+          <div className="space-y-1">
+            <label className="text-sm font-medium text-gray-700">Custo medio (opcional)</label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30"
+              value={form.cost_price}
+              onChange={(event) => onChange('cost_price', event.target.value)}
+            />
+          </div>
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-full border border-gray-300 px-4 py-2 text-sm font-semibold text-gray-600 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="submit"
+              disabled={isSaving}
+              className="rounded-full bg-blue-600 px-5 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-500/30 transition hover:brightness-110 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSaving ? 'Salvando...' : 'Salvar alteracoes'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   )
 }
